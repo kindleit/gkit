@@ -4,9 +4,10 @@ import Keys._
 object build extends Build {
 
   lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
-    version           := "0.1.0-SNAPSHOT",
-    organization      := "com.kindleit",
-    scalaVersion      := "2.10.3",
+    version            := "0.1.0-SNAPSHOT",
+    organization       := "com.kindleit",
+    scalaVersion       := "2.10.3",
+    scalacOptions     ++= Seq("-feature", "-language:reflectiveCalls", "-language:higherKinds"),
     resolvers         ++= Seq(
       "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
       "Sonatype Snapshots"  at "http://oss.sonatype.org/content/repositories/snapshots/",
@@ -21,12 +22,12 @@ object build extends Build {
         Some("releases"  at kitsd + "releases")
     })
 
-  val jodaTime      = "joda-time"         %  "joda-time"     % "2.2"
-  val jodaConvert   = "org.joda"          %  "joda-convert"  % "1.3.1"
+  val jodaTime      = "joda-time"         %  "joda-time"     % "2.3"
+  val jodaConvert   = "org.joda"          %  "joda-convert"  % "1.6"
   val scalaz        = "org.scalaz"        %% "scalaz-core"   % "7.1.0-SNAPSHOT"
   val shapeless     = "com.chuusai"       %  "shapeless"     % "2.0.0-SNAPSHOT" cross CrossVersion.full changing()
   val reactivemongo = "org.reactivemongo" %% "reactivemongo" % "0.10.0"
-  val play          = "com.typesafe.play" %% "play"          % "2.2.2-RC2"     % "provided"
+  val play          = "com.typesafe.play" %% "play"          % "2.2.2"     % "provided"
 
   lazy val internal = Project(
     id        = "internal",
