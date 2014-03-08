@@ -6,7 +6,7 @@ import reactivemongo.bson._
 
 import scala.language.experimental.macros
 
-import scalaz._
+import scalaz.\/
 import scalaz.std.list._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
@@ -96,7 +96,7 @@ object BSONPickler {
       def unpickle(v: BSONValue): String \/ (FieldType[F, V] :: T) = ???
     }
 
-  implicit def BSONPicklerI: ProductTypeClass[BSONPickler] = new ProductTypeClass[BSONPickler] {
+  implicit def BSONPicklerI: TypeClass[BSONPickler] = new TypeClass[BSONPickler] {
 
     def emptyProduct: BSONPickler[HNil] = new BSONPickler[HNil] {
       def pickle(nil: HNil): BSONValue = BSONDocument()
@@ -131,6 +131,16 @@ object BSONPickler {
         r <- instance.unpickle(v)
       } yield r
     }
+
+    def coproduct[L, R <: Coproduct](BL: => BSONPickler[L], BR: => BSONPickler[R]): BSONPickler[L :+: R] =
+      new BSONPickler[L :+: R] {
+        def pickle(c: L :+: R): BSONValue = c match {
+          case Inl(l) => BL.pickle(l)
+          case Inr(r) => BR.pickle(r)
+        }
+        def unpickle(v: BSONValue): String \/ (L :+: R) =
+          BL.unpickle(v).map(Inl[L, R](_)).orElse(BR.unpickle(v).map(r => Inr[L, R](r)))
+      }
 
     def project[F, G](instance: => BSONPickler[G], to: F => G, from: G => F): BSONPickler[F] = new BSONPickler[F] {
       def pickle(f: F): BSONValue = instance.pickle(to(f))

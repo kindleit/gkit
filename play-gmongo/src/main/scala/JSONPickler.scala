@@ -10,7 +10,7 @@ import reactivemongo.bson.BSONObjectID
 
 import scala.language.experimental.macros
 
-import scalaz._
+import scalaz.\/
 import scalaz.std.list._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
@@ -73,7 +73,7 @@ object JSONPickler {
     } yield r
   }
 
-  implicit def JSONPicklerI: ProductTypeClass[JSONPickler] = new ProductTypeClass[JSONPickler] {
+  implicit def JSONPicklerI: TypeClass[JSONPickler] = new TypeClass[JSONPickler] {
 
     def emptyProduct: JSONPickler[HNil] = new JSONPickler[HNil] {
       def pickle(nil: HNil) = Json.obj()
@@ -98,6 +98,16 @@ object JSONPickler {
           h <- head.unpickle(v)
           t <- tail.unpickle(JsObject(o.fields.filter(_ != (name, v))))
         } yield h :: t
+      }
+
+    def coproduct[L, R <: Coproduct](BL: => JSONPickler[L], BR: => JSONPickler[R]): JSONPickler[L :+: R] =
+      new JSONPickler[L :+: R] {
+        def pickle(c: L :+: R): JsValue = c match {
+          case Inl(l) => BL.pickle(l)
+          case Inr(r) => BR.pickle(r)
+        }
+        def unpickle(v: JsValue): String \/ (L :+: R) =
+          BL.unpickle(v).map(Inl[L, R](_)).orElse(BR.unpickle(v).map(r => Inr[L, R](r)))
       }
 
     def project[F, G](instance: => JSONPickler[G], to: F => G, from: G => F): JSONPickler[F] = new JSONPickler[F] {
