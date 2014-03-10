@@ -34,7 +34,7 @@ object build extends Build {
     id        = "gkit",
     base      = file("."),
     settings  = defaultSettings,
-    aggregate = Seq(gMongo, playGJSON, playGResource))
+    aggregate = Seq(gPickler, gMongo, playGJSON, playGResource))
 
   lazy val gPickler = Project(
     id       = "gpickler",
