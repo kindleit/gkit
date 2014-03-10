@@ -1,12 +1,10 @@
-package play.modules.gmongo
+package play.modules.gjson
 
-import gmongo.Pickler
+import gpickler.Pickler
 
 import play.api.libs.json._
 
 import org.joda.time.DateTime
-
-import reactivemongo.bson.BSONObjectID
 
 import scala.language.experimental.macros
 
@@ -50,14 +48,6 @@ object JSONPickler {
       jso <- typecheck[JsObject](v, x => x)
       jss <- (jso \ "$date").asOpt[JsNumber].cata(_.right, "number expected".left)
     } yield new DateTime(jss.value)
-  }
-
-  implicit def BSONObjectIDPickler: JSONPickler[BSONObjectID] = new JSONPickler[BSONObjectID] {
-    def pickle(boid: BSONObjectID): JsValue = Json.obj("$oid" -> boid.stringify)
-    def unpickle(v: JsValue): String \/ BSONObjectID = for {
-      jso <- typecheck[JsObject](v, x => x)
-      jss <- (jso \ "$oid").asOpt[JsString].cata(_.right, "string expected".left)
-    } yield BSONObjectID(jss.value)
   }
 
   implicit def OptionJSONPickler[T](implicit bp: JSONPickler[T]): JSONPickler[Option[T]] = new JSONPickler[Option[T]] {

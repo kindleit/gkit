@@ -1,4 +1,4 @@
-package play.modules.gmongo
+package play.modules.gjson
 
 import play.api.libs.json.JsValue
 

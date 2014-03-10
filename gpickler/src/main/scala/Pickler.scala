@@ -1,4 +1,4 @@
-package gmongo
+package gpickler
 
 import scalaz._
 import scalaz.syntax.std.option._

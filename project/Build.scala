@@ -28,27 +28,36 @@ object build extends Build {
   val shapeless     = "com.chuusai"       %  "shapeless"     % "2.0.0-SNAPSHOT" cross CrossVersion.full changing()
   val reactivemongo = "org.reactivemongo" %% "reactivemongo" % "0.10.0"
   val play          = "com.typesafe.play" %% "play"          % "2.2.2"     % "provided"
+  val playJSON      = "com.typesafe.play" %% "play-json"     % "2.2.2"
 
-  lazy val internal = Project(
-    id        = "internal",
+  lazy val gkit = Project(
+    id        = "gkit",
     base      = file("."),
     settings  = defaultSettings,
-    aggregate = Seq(gMongo, playGMongo, playGResource))
+    aggregate = Seq(gMongo, playGJSON, playGResource))
+
+  lazy val gPickler = Project(
+    id       = "gpickler",
+    base     = file("gpickler"),
+    settings = defaultSettings ++ Seq(
+      name                := "gpickler",
+      libraryDependencies ++= Seq(scalaz, shapeless)))
 
   lazy val gMongo = Project(
     id       = "gmongo",
     base     = file("gmongo"),
     settings = defaultSettings ++ Seq(
       name                := "gmongo",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, reactivemongo)))
+      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, reactivemongo)),
+    dependencies = Seq(gPickler))
 
-  lazy val playGMongo = Project(
-    id       = "play-gmongo",
-    base     = file("play-gmongo"),
+  lazy val playGJSON = Project(
+    id       = "play-gjson",
+    base     = file("play-gjson"),
     settings = defaultSettings ++ Seq(
-      name                := "play-gmongo",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, play)),
-    dependencies = Seq(gMongo))
+      name                := "play-gjson",
+      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, playJSON)),
+    dependencies = Seq(gPickler))
 
   lazy val playGResource = Project(
     id       = "play-gresource",
@@ -56,5 +65,5 @@ object build extends Build {
     settings = defaultSettings ++ Seq(
       name                := "play-gresource",
       libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, play)),
-    dependencies = Seq(playGMongo))
+    dependencies = Seq(gMongo, playGJSON))
 }

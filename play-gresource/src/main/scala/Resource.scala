@@ -5,7 +5,7 @@ import gmongo._
 import play.api.libs.json._
 import play.api.mvc._
 
-import play.modules.gmongo._
+import play.modules.gjson._
 
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.core.commands.LastError
@@ -37,7 +37,7 @@ class Resource[A, ID]
   )
     extends ResourceRoutes[ID] with ResourceCtlr[ID] {
 
-  import play.modules.gmongo.JSON._
+  import play.modules.gjson.JSON._
 
   implicit val ec = dbe.executionContext
 

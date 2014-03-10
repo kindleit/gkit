@@ -1,5 +1,7 @@
 package gmongo
 
+import gpickler.Pickler
+
 import org.joda.time.DateTime
 
 import reactivemongo.bson._

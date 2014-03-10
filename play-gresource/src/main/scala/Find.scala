@@ -7,7 +7,7 @@ import play.api.mvc._
 import play.core._
 import play.core.Router._
 
-import play.modules.gmongo._
+import play.modules.gjson._
 
 import scala.concurrent.Future
 
@@ -23,7 +23,7 @@ class Find[A, Q](cname: String, query: Q)
   )
     extends Op with Controller {
 
-  import play.modules.gmongo.JSON._, BSON._
+  import play.modules.gjson.JSON._, BSON._
 
   implicit val ec = dbe.executionContext
 
