@@ -15,6 +15,7 @@ import scalaz.syntax.std.option._
 import scalaz.syntax.traverse._
 
 import shapeless._
+import shapeless.record._
 
 trait JSONPickler[A] extends Pickler[A, JsValue]
 
@@ -62,6 +63,36 @@ object JSONPickler {
       r  <- ps.toList.sequence[({type t[T] = String \/ T})#t, T]
     } yield r
   }
+
+  implicit def HNilJSONPickler: JSONPickler[HNil] =
+    new JSONPickler[HNil] {
+      def pickle(nil: HNil): JsValue = Json.obj()
+      def unpickle(v: JsValue): String \/ HNil = HNil.right
+    }
+
+  implicit def HListJSONPickler[H, T <: HList]
+    (implicit hbp: JSONPickler[H], tbp: JSONPickler[T]): JSONPickler[H :: T] =
+    new JSONPickler[H :: T] {
+      def pickle(l: H :: T): JsValue = {
+        val h = Json.arr(hbp.pickle(l.head))
+        val t = tbp.pickle(l.tail)
+        h ++ (if (t == Json.obj()) Json.arr() else t).asInstanceOf[JsArray]
+      }
+      def unpickle(v: JsValue): String \/ (H :: T) = ???
+    }
+
+  implicit def RecordJSONPickler[F, V, T <: HList]
+    (implicit hjp: JSONPickler[V], tjp: JSONPickler[T], wk: Witness.Aux[F]): JSONPickler[FieldType[F, V] :: T] =
+    new JSONPickler[FieldType[F, V] :: T] {
+      def pickle(l: FieldType[F, V] :: T): JsValue = {
+        val p = wk.value match {
+          case s: Symbol => s.toString.drop(1)
+          case a: Any    => a.toString
+        }
+        Json.obj(p -> hjp.pickle(l.head:V)) ++ tjp.pickle(l.tail).asInstanceOf[JsObject]
+      }
+      def unpickle(v: JsValue): String \/ (FieldType[F, V] :: T) = ???
+    }
 
   implicit def JSONPicklerI: TypeClass[JSONPickler] = new TypeClass[JSONPickler] {
 
