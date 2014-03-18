@@ -82,16 +82,27 @@ object JSONPickler {
     }
 
   implicit def RecordJSONPickler[F, V, T <: HList]
-    (implicit hjp: JSONPickler[V], tjp: JSONPickler[T], wk: Witness.Aux[F]): JSONPickler[FieldType[F, V] :: T] =
-    new JSONPickler[FieldType[F, V] :: T] {
-      def pickle(l: FieldType[F, V] :: T): JsValue = {
-        val p = wk.value match {
-          case s: Symbol => s.toString.drop(1)
-          case a: Any    => a.toString
-        }
-        Json.obj(p -> hjp.pickle(l.head:V)) ++ tjp.pickle(l.tail).asInstanceOf[JsObject]
+    (implicit
+      hjp   : JSONPickler[V]
+    , tjp   : JSONPickler[T]
+    , wk    : Witness.Aux[F]
+    , tpble : Typeable[V]
+    , tm    : Manifest[V]
+    )       : JSONPickler[FieldType[F, V] :: T]
+    = new JSONPickler[FieldType[F, V] :: T]
+    {
+      val name = wk.value match {
+        case s: Symbol => s.toString.drop(1)
+        case a: Any    => a.toString
       }
-      def unpickle(v: JsValue): String \/ (FieldType[F, V] :: T) = ???
+      def pickle(l: FieldType[F, V] :: T): JsValue =
+        Json.obj(name -> hjp.pickle(l.head:V)) ++ tjp.pickle(l.tail).asInstanceOf[JsObject]
+      def unpickle(v: JsValue): String \/ (FieldType[F, V] :: T) = for {
+        o <- typecheck[JsObject](v, x => x)
+        v <- o.value.get(name).cata(_.right, s"field `$name' not found".left)
+        h <- hjp.unpickle(v)
+        t <- tjp.unpickle(JsObject(o.fields.filter(_ != (name, v))))
+      } yield field[F](h) :: t
     }
 
   implicit def JSONPicklerI: TypeClass[JSONPickler] = new TypeClass[JSONPickler] {
