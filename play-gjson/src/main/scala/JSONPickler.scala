@@ -82,15 +82,8 @@ object JSONPickler {
     }
 
   implicit def RecordJSONPickler[F, V, T <: HList]
-    (implicit
-      hjp   : JSONPickler[V]
-    , tjp   : JSONPickler[T]
-    , wk    : Witness.Aux[F]
-    , tpble : Typeable[V]
-    , tm    : Manifest[V]
-    )       : JSONPickler[FieldType[F, V] :: T]
-    = new JSONPickler[FieldType[F, V] :: T]
-    {
+    (implicit hjp: JSONPickler[V], tjp: JSONPickler[T], wk: Witness.Aux[F]): JSONPickler[FieldType[F, V] :: T] =
+    new JSONPickler[FieldType[F, V] :: T] {
       val name = wk.value match {
         case s: Symbol => s.toString.drop(1)
         case a: Any    => a.toString
