@@ -1,6 +1,6 @@
 package play.modules.gjson
 
-import gpickler.Pickler
+import gkit.Pickler
 
 import play.api.libs.json._
 
@@ -53,7 +53,10 @@ object JSONPickler {
 
   implicit def OptionJSONPickler[T](implicit bp: JSONPickler[T]): JSONPickler[Option[T]] = new JSONPickler[Option[T]] {
     def pickle(t: Option[T]): JsValue = t.map(bp.pickle).getOrElse(JsNull)
-    def unpickle(v: JsValue): String \/ Option[T] = bp.unpickle(v).map(Some(_))
+    def unpickle(v: JsValue): String \/ Option[T] = v match {
+      case JsNull => None.right
+      case x      => bp.unpickle(x).map(Some(_))
+    }
   }
 
   implicit def ListJSONPickler[T](implicit bp: JSONPickler[T]): JSONPickler[List[T]] = new JSONPickler[List[T]] {
@@ -119,7 +122,7 @@ object JSONPickler {
         }
         def unpickle(v: JsValue): String \/ (H :: T) = for {
           o <- typecheck[JsObject](v, x => x)
-          v <- o.value.get(name).cata(_.right, s"field `$name' not found".left)
+          v <- o.value.get(name).cata(_.right, JsNull.right)
           h <- head.unpickle(v)
           t <- tail.unpickle(JsObject(o.fields.filter(_ != (name, v))))
         } yield h :: t

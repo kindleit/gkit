@@ -1,0 +1,16 @@
+package gkit.mongo
+
+case class Set[A]($set: A)
+case class Unset[A]($unset: A)
+case class Exists[A]($exists: A)
+case class Push[A]($push: A)
+case class Match[A]($match: A)
+case class Project[A]($project: A)
+case class Unwind[A]($unwind: A)
+case class Group[A]($group: A)
+case class Limit[A]($limit: A)
+case class Skip[A]($skip: A)
+case class Sort[A]($sort: A)
+case class First[A]($first: A)
+case class Last[A]($last: A)
+case class AddToSet[A]($addToSet: A)
