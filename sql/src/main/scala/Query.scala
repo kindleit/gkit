@@ -93,9 +93,10 @@ case class Query[A <: HList, B <: HList, C <: HList]
     restriction.map(f => Where(f(*)))
 
   lazy val selectStatement = {
-    val s = Select(row.columns(project(*)), From(table.name :: relations) :: evalRestriction.toList)
-    val t = (offset |@| limit)((m, n) => mkSS98pagQry(s, m, n)).getOrElse(s)
-    showAST(t)
+    val ts = (table.name :: relations).distinct
+    val s1 = Select(row.columns(project(*)), From(ts) :: evalRestriction.toList)
+    val s2 = (offset |@| limit)((m, n) => mkSS98pagQry(s1, m, n)).getOrElse(s1)
+    showAST(s2)
   }
 
   lazy val insertStatement =
