@@ -48,7 +48,7 @@ object JSONPickler {
     def unpickle(v: JsValue): String \/ DateTime = for {
       jso <- typecheck[JsObject](v, x => x)
       jss <- (jso \ "$date").asOpt[JsNumber].cata(_.right, "number expected".left)
-    } yield new DateTime(jss.value)
+    } yield new DateTime(jss.value.toLong)
   }
 
   implicit def OptionJSONPickler[T](implicit bp: JSONPickler[T]): JSONPickler[Option[T]] = new JSONPickler[Option[T]] {
