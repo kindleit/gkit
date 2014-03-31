@@ -38,25 +38,23 @@ case class Update[A, ID](cname: String)
 
   implicit val ec = dbe.executionContext
 
-  lazy val paramsExt =
+  lazy val route =
     Route("PUT", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
-  def routes = {
-    case paramsExt(params) => call(params.fromPath[ID]("id"))(update)
+  def mkResponse(params: RouteParams) = call(params.fromPath[ID]("id"))(update)
+
+  def update(id: ID) = Action.async(BodyParsers.parse.json) { req =>
+    fromRequest(req).fold(e => Future(BadRequest(e)), a => doUpdate(id, a).map(mkAction))
   }
+
+  def fromRequest(req: Request[JsValue]): String \/ A =
+    req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
 
   def doUpdate(id: ID, a: A) = {
     val b = BSONDocument(BSON.toBSONDoc(a).elements.filter(_._1 != "_id"))
     collection(cname).update(IdQ(id), Set(b))
   }
 
-  def mkResponse(le: LastError) =
+  def mkAction(le: LastError) =
     le.ok.fold(Ok, InternalServerError(~le.errMsg))
-
-  def fromRequest(req: Request[JsValue]): String \/ A =
-    req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
-
-  def update(id: ID) = Action.async(BodyParsers.parse.json) { req =>
-    fromRequest(req).fold(e => Future(BadRequest(e)), a => doUpdate(id, a).map(mkResponse))
-  }
 }

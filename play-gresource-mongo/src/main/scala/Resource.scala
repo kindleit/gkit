@@ -20,9 +20,12 @@ object Resource {
     , idbsp : BSONPickler[ID]
     , idpb  : PathBindable[ID]
     )
-    = Filter[A](cname, EmptyQ) |:
-      Filter1[A, ID](cname)    |:
-      Insert[A, ID](cname)     |:
-      Update[A, ID](cname)     |:
+    =
+    {
+      Find[A](cname, Find.mkDefaultQry) |:
+      FindOne[A, ID](cname)  |:
+      Insert[A, ID](cname)   |:
+      Update[A, ID](cname)   |:
       Delete[ID](cname)
+    }
 }

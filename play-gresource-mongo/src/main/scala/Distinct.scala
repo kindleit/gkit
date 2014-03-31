@@ -27,17 +27,15 @@ class Distinct[R, Q](cname: String, key: String, query: Q)
 
   implicit val ec = dbe.executionContext
 
-  lazy val paramsExt = Route("GET", PathPattern(List(StaticPart(prefix))))
+  lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def routes = {
-    case paramsExt(_) => call(distinct)
-  }
-
-  def mkResponse(r: Future[String \/ R]) =
-    Action.async(r.map(_.fold(e => InternalServerError(e), as => Ok(toJSON(as)))))
+  def mkResponse(params: RouteParams) = call(distinct)
 
   def distinct =
-    mkResponse(collection(cname).distinct[R](key, query))
+    mkAction(collection(cname).distinct[R](key, query))
+
+  def mkAction(r: Future[String \/ R]) =
+    Action.async(r.map(_.fold(e => InternalServerError(e), as => Ok(toJSON(as)))))
 }
 
 object Distinct {

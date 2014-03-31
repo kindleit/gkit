@@ -19,7 +19,7 @@ import scalaz.syntax.std.option._
 import shapeless._
 import shapeless.ops.record._
 
-object Filter {
+object Find {
   def apply[A <: HList, B <: HList](table: Table[A])
     (implicit
       db    : DB
@@ -29,14 +29,12 @@ object Filter {
     )
     = new Op {
 
-      lazy val paramsExt = Route("GET", PathPattern(List(StaticPart(prefix))))
+      lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-      def routes = {
-        case paramsExt(params) =>
-          call(params.fromQuery[Int]("skip", Some(0)), params.fromQuery[Int]("limit", Some(10)))(filter)
-      }
+      def mkResponse(params: RouteParams) =
+        call(params.fromQuery[Int]("skip", Some(0)), params.fromQuery[Int]("limit", Some(10)))(find)
 
-      def filter(skip: Int, limit: Int) = Action { _ =>
+      def find(skip: Int, limit: Int) = Action { _ =>
         val q = table.map(a => a).drop(skip).take(limit).toList
         val k = q.map(_.fold(InternalServerError(_), xs => Ok(toJSON(xs))))
         IO(db.getConnection).using(k).unsafePerformIO()
@@ -53,17 +51,15 @@ object Filter {
     )
     = new Op
     {
-      lazy val paramsExt = Route("GET", PathPattern(List(StaticPart(prefix))))
+      lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-      def routes = {
-        case paramsExt(params) =>
-          call(
-            params.fromQuery[Int]("pid", None),
-            params.fromQuery[Int]("skip", Some(0)),
-            params.fromQuery[Int]("limit", Some(10)))(filter)
-      }
+      def mkResponse(params: RouteParams) =
+        call(
+          params.fromQuery[Int]("pid", None),
+          params.fromQuery[Int]("skip", Some(0)),
+          params.fromQuery[Int]("limit", Some(10)))(find)
 
-      def filter(pid: Int, skip: Int, limit: Int) = Action { _ =>
+      def find(pid: Int, skip: Int, limit: Int) = Action { _ =>
         val q = table.filter(_.get(pidf) === pid).drop(skip).take(limit).toList
         val k = q.map(_.fold(InternalServerError(_), xs => Ok(toJSON(xs))))
         IO(db.getConnection).using(k).unsafePerformIO()
@@ -71,7 +67,7 @@ object Filter {
     }
 }
 
-case class Filter1[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[B])
+case class FindOne[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[B])
   (implicit
     db    : DB
   , idfs  : Selector.Aux[A, B, Column[Int]]
@@ -80,14 +76,12 @@ case class Filter1[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[
   , jp    : JSONPickler[C]
   ) extends Op {
 
-  lazy val paramsExt =
+  lazy val route =
     Route("GET", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))
 
-  def routes = {
-    case paramsExt(params) => call(params.fromPath[Int]("id", None))(filter1)
-  }
+  def mkResponse(params: RouteParams) = call(params.fromPath[Int]("id", None))(findOne)
 
-  def filter1(id: Int) = Action { _ =>
+  def findOne(id: Int) = Action { _ =>
     val q = table.filter(_.get(idf) === id).first
     val k = q.map(_.fold(InternalServerError(_), _.cata(x => Ok(toJSON(x)), NotFound)))
     IO(db.getConnection).using(k).unsafePerformIO()

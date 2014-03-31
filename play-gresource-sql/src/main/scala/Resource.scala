@@ -23,7 +23,7 @@ object Resource {
     , jp1  : JSONPickler[E]
     , jp2  : JSONPickler[F]
     )
-    = Filter(table) |: Insert(table, idf) |: Filter1(table, idf) |: Update(table, idf) |: Delete(table, idf)
+    = Find(table) |: Insert(table, idf) |: FindOne(table, idf) |: Update(table, idf) |: Delete(table, idf)
 
   def apply[A <: HList, B, C, D, E <: HList, F <: HList, G <: HList]
     (table: Table[A], idf: Witness.Aux[B], pidf: Witness.Aux[C])
@@ -40,5 +40,5 @@ object Resource {
     , jp1  : JSONPickler[F]
     , jp2  : JSONPickler[G]
     )
-    = Filter(table, pidf) |: Insert(table, idf) |: Filter1(table, idf) |: Update(table, idf) |: Delete(table, idf)
+    = Find(table, pidf) |: Insert(table, idf) |: FindOne(table, idf) |: Update(table, idf) |: Delete(table, idf)
 }

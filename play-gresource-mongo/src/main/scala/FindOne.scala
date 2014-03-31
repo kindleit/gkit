@@ -16,7 +16,7 @@ import scala.concurrent.Future
 import scalaz._
 import scalaz.syntax.std.option._
 
-case class Filter1[A, ID](cname: String)
+case class FindOne[A, ID](cname: String)
   (implicit
     dbe: DbEnv
   , bsp: BSONPickler[A]
@@ -29,15 +29,12 @@ case class Filter1[A, ID](cname: String)
 
   implicit val ec = dbe.executionContext
 
-  lazy val paramsExt =
+  lazy val route =
     Route("GET", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
-  def routes = {
-    case paramsExt(params) => call(params.fromPath[ID]("id", None))(filter1)
-  }
+  def mkResponse(params: RouteParams) = call(params.fromPath[ID]("id", None))(findOne)
 
-  def mkResponse(r: Future[Option[A]]) =
-    Action.async(r.map(_.cata(a => Ok(toJSON(a)), NotFound)))
+  def findOne(id: ID) = mkAction(collection(cname).find(IdQ(id)).one[A])
 
-  def filter1(id: ID) = mkResponse(collection(cname).find(IdQ(id)).one[A])
+  def mkAction(r: Future[Option[A]]) = Action.async(r.map(_.cata(a => Ok(toJSON(a)), NotFound)))
 }

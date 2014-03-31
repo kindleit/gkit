@@ -21,12 +21,11 @@ case class Delete[ID](cname: String)
 
   implicit val ec = dbe.executionContext
 
-  lazy val paramsExt =
+  lazy val route =
     Route("DELETE", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
-  def routes = {
-    case paramsExt(params) => call(params.fromPath[ID]("id"))(delete)
-  }
+  def mkResponse(params: RouteParams) =
+    call(params.fromPath[ID]("id"))(delete)
 
   def delete(id: ID) =
     Action.async(collection(cname).remove(IdQ(id)).map(le => (le.updated > 0).fold(Ok, NotFound)))

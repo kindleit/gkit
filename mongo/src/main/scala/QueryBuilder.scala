@@ -13,7 +13,8 @@ import scalaz.syntax.std.option._
 
 case class QueryBuilder(
   dbe: DbEnv,
-  queryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter]) {
+  queryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter],
+  upTo: Int = Int.MaxValue) {
 
   import BSON._
 
@@ -28,7 +29,7 @@ case class QueryBuilder(
     copy(queryBuilder = queryBuilder.sort(toBSONDoc(order)))
 
   def take(n: Int): QueryBuilder =
-    copy(queryBuilder = queryBuilder.options(QueryOpts(batchSizeN = n)))
+    copy(queryBuilder = queryBuilder.options(QueryOpts(batchSizeN = n)), upTo = n)
 
   def drop(n: Int): QueryBuilder =
     copy(queryBuilder = queryBuilder.options(QueryOpts(skipN = n)))

@@ -28,19 +28,17 @@ case class Insert[A <: HList, B, C, D <: HList, E <: HList](table: Table[A], idf
   , jp   : JSONPickler[E]
   ) extends Op {
 
-  lazy val paramsExt = Route("POST", PathPattern(List(StaticPart(prefix))))
+  lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
-  def routes = {
-    case paramsExt(params) => call(insert)
+  def mkResponse(params: RouteParams) = call(insert)
+
+  def insert = Action(BodyParsers.parse.json) { req =>
+    fromJSON[E](req.body).bimap(BadRequest(_), doInsert).merge
   }
 
   def doInsert(a: E) = {
     val q = table.map(_ - idf).insert(a)
     val k = q.map(_.fold(InternalServerError(_), ru => Ok(toJSON(ru))))
     IO(db.getConnection).using(k).unsafePerformIO()
-  }
-
-  def insert = Action(BodyParsers.parse.json) { req =>
-    fromJSON[E](req.body).bimap(BadRequest(_), doInsert).merge
   }
 }

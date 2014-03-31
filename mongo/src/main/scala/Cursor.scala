@@ -14,14 +14,14 @@ import scalaz.syntax.monoid._
 import scalaz.syntax.std.option._
 import scalaz.syntax.validation._
 
-case class Cursor[T](dbe: DbEnv, cursor: reactivemongo.api.Cursor[T]) {
+case class Cursor[T](dbe: DbEnv, cursor: reactivemongo.api.Cursor[T], upTo: Int = Int.MaxValue) {
 
   implicit val ec = dbe.executionContext
 
   def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false): Enumerator[T] =
     cursor.enumerate(maxDocs, stopOnError)
 
-  def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)
+  def collect[M[_]](stopOnError: Boolean = true)
     (implicit cbf: CanBuildFrom[M[_], T, M[T]]): Future[String \/ M[T]] =
     cursor.collect[M](upTo, stopOnError).map(_.right).recover {
       case de: DatabaseException => (~de.code.map(_.toString)).left

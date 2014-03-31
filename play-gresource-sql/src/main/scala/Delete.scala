@@ -25,12 +25,11 @@ case class Delete[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[B
   , r    : Row.Aux[A, C]
   ) extends Op {
 
-  lazy val paramsExt =
+  lazy val route =
     Route("DELETE", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))
 
-  def routes = {
-    case paramsExt(params) => call(params.fromPath[Int]("id", None))(delete)
-  }
+  def mkResponse(params: RouteParams) =
+    call(params.fromPath[Int]("id", None))(delete)
 
   def delete(id: Int) = Action { _ =>
     val q = table.filter(_.get(idf) === id).delete

@@ -8,24 +8,54 @@ import play.core._
 
 import scala.runtime.AbstractPartialFunction
 
-abstract class Op extends Routes { outer =>
+import scalaz.std.partialFunction._
+import scalaz.syntax.arrow._
+
+abstract class Op extends Routes { self =>
 
   private var path: String = ""
 
+  val route: Route.ParamsExtractor
+
+  def mkResponse(params: RouteParams): Handler
+
+  def handle: PartialFunction[(RouteParams, Boolean), Handler] = {
+    case (params, true) => mkResponse(params)
+    case (_, false)     => Action(Forbidden)
+  }
+
+  def routes = (extractParams(route) &&& _filter) >>> handle
+
+  def extractParams(pe: Route.ParamsExtractor): PartialFunction[RequestHeader, RouteParams] = {
+    case pe(params) => params
+  }
+
+  def _filter: PartialFunction[RequestHeader, Boolean] = { case _ => true }
+
+  def filter(f: RequestHeader => Boolean) = new Op {
+    val route = self.route
+    def mkResponse(params: RouteParams) = self.mkResponse(params)
+    override def _filter = { case rh => f(rh) }
+  }
+
   def orElse(op: Op): Op = new Op {
-    def routes = new AbstractPartialFunction[RequestHeader, Handler] {
+    val route = self.route
+    def mkResponse(params: RouteParams) = self.mkResponse(params)
+    override def routes = new AbstractPartialFunction[RequestHeader, Handler] {
       op.setPrefix(prefix)
-      outer.setPrefix(prefix)
+      self.setPrefix(prefix)
       override def applyOrElse[A <: RequestHeader, B >: Handler](rh: A, default: A => B) =
-        op.routes.applyOrElse(rh, outer.routes)
+        op.routes.applyOrElse(rh, self.routes)
       override def isDefinedAt(rh: RequestHeader) =
-        op.routes.isDefinedAt(rh) || outer.routes.isDefinedAt(rh)
+        op.routes.isDefinedAt(rh) || self.routes.isDefinedAt(rh)
     }
   }
 
   def |:(op: Op) = orElse(op)
 
+  def prefix = path
+
   def setPrefix(prefix: String) = { path = prefix }
-  def prefix: String = path
-  def documentation: Seq[(String, String, String)] = Seq()
+
+  def documentation = Seq()
 }

@@ -29,20 +29,18 @@ case class Update[A <: HList, B, C, D <: HList, E <: HList](table: Table[A], idf
   , jp   : JSONPickler[E]
   ) extends Op {
 
-  lazy val paramsExt =
+  lazy val route =
     Route("PUT", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))
 
-  def routes = {
-    case paramsExt(params) => call(params.fromPath[Int]("id", None))(update)
+  def mkResponse(params: RouteParams) = call(params.fromPath[Int]("id", None))(update)
+
+  def update(id: Int) = Action(BodyParsers.parse.json) { req =>
+    fromJSON[E](req.body).bimap(BadRequest(_), doUpdate(id)).merge
   }
 
   def doUpdate(id: Int)(a: E) = {
     val q = table.map(_ - idf).filter(_.get(idf) === id).update(a)
     val k = q.map(_.fold(InternalServerError(_), ru => Ok(toJSON(ru))))
     IO(db.getConnection).using(k).unsafePerformIO()
-  }
-
-  def update(id: Int) = Action(BodyParsers.parse.json) { req =>
-    fromJSON[E](req.body).bimap(BadRequest(_), doUpdate(id)).merge
   }
 }

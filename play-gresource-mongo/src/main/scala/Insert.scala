@@ -40,22 +40,20 @@ case class Insert[A, ID](cname: String)
 
   implicit val ec = dbe.executionContext
 
-  lazy val paramsExt = Route("POST", PathPattern(List(StaticPart(prefix))))
+  lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
-  def routes = {
-    case paramsExt(_) => call(insert)
+  def mkResponse(params: RouteParams) = insert
+
+  def insert = Action.async(BodyParsers.parse.json) { req =>
+    val id = gen.generate
+    fromRequest(id, req).fold(e => Future(BadRequest(e)), a => doInsert(a).map(mkAction(id)))
   }
-
-  def doInsert(a: A) = collection(cname).insert(a)
-
-  def mkResponse(id: ID)(le: LastError) =
-    le.ok.fold(Ok(toJSON(id)), InternalServerError(~le.errMsg))
 
   def fromRequest(id: ID, req: Request[JsValue]): String \/ A =
     req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
 
-  def insert = Action.async(BodyParsers.parse.json) { req =>
-    val id = gen.generate
-    fromRequest(id, req).fold(e => Future(BadRequest(e)), a => doInsert(a).map(mkResponse(id)))
-  }
+  def doInsert(a: A) = collection(cname).insert(a)
+
+  def mkAction(id: ID)(le: LastError) =
+    le.ok.fold(Ok(toJSON(id)), InternalServerError(~le.errMsg))
 }
