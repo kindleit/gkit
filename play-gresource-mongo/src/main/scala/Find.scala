@@ -18,13 +18,13 @@ import scala.concurrent.Future
 import scalaz._
 import scalaz.syntax.std.option._
 
-class Find[A, P](cname: String, mkQuery: (P, Collection) => QueryBuilder)
+class Find[A, B](cname: String, mkQuery: (B, Collection) => QueryBuilder)
   (implicit
     dbe: DbEnv
   , bsp: BSONPickler[A]
   , jsp: JSONPickler[A]
   , bspj: BSONProj[A]
-  , pc: ParamsCollector[P]
+  , pc: ParamsCollector[B]
   ) extends Op {
 
   import play.modules.gjson.JSON._
@@ -45,15 +45,15 @@ class Find[A, P](cname: String, mkQuery: (P, Collection) => QueryBuilder)
 
 object Find {
   def apply[A] = new {
-    def apply[P](cname: String, mkQuery: (P, Collection) => QueryBuilder)
+    def apply[B](cname: String, mkQuery: (B, Collection) => QueryBuilder)
       (implicit
         dbe: DbEnv
       , bsp: BSONPickler[A]
       , jsp: JSONPickler[A]
       , bspj: BSONProj[A]
-      , pc: ParamsCollector[P]
+      , pc: ParamsCollector[B]
       )
-      = new Find[A, P](cname, mkQuery)
+      = new Find[A, B](cname, mkQuery)
   }
 
   case class DefaultParams(skip: Option[Int], limit: Option[Int])
