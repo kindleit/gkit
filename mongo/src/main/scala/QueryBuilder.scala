@@ -38,7 +38,7 @@ case class QueryBuilder(
 
   def limit(n: Int): QueryBuilder = take(n)
 
-  def cursor[A](implicit bp: BSONPickler[A]) = Cursor(dbe, queryBuilder.cursor[A])
+  def cursor[A](implicit bp: BSONPickler[A]) = Cursor(dbe, queryBuilder.cursor[A], upTo)
 
   def one[A](implicit bp: BSONPickler[A]) = queryBuilder.one[A]
 }
