@@ -8,6 +8,8 @@ import org.joda.time.DateTime
 
 import scala.language.experimental.macros
 
+import scala.reflect.macros.Context
+
 import scalaz.\/
 import scalaz.std.list._
 import scalaz.syntax.either._
@@ -21,7 +23,7 @@ trait JSONPickler[A] extends Pickler[A, JsValue]
 
 object JSONPickler {
 
-  implicit def apply[T]: JSONPickler[T] = macro TypeClass.derive_impl[JSONPickler, T]
+  implicit def apply[T]: JSONPickler[T] = macro GenericMacros.deriveLabelledInstance[JSONPickler, T]
 
   implicit def StringJSONPickler: JSONPickler[String] = new JSONPickler[String] {
     def pickle(s: String): JsValue = JsString(s)
@@ -101,46 +103,46 @@ object JSONPickler {
       } yield field[F](h) :: t
     }
 
-  implicit def JSONPicklerI: TypeClass[JSONPickler] = new TypeClass[JSONPickler] {
+  implicit def JSONPicklerI: LabelledTypeClass[JSONPickler] = new LabelledTypeClass[JSONPickler] {
 
     def emptyProduct: JSONPickler[HNil] = new JSONPickler[HNil] {
       def pickle(nil: HNil) = Json.obj()
       def unpickle(b: JsValue) = HNil.right
     }
 
-    def product[H, T <: HList](head: JSONPickler[H], tail: JSONPickler[T]): JSONPickler[H :: T] =
-      new JSONPickler[H :: T] {
-        def pickle(l: H :: T): JsValue = ???
-        def unpickle(v: JsValue): String \/ (H :: T) = ???
-      }
-
-    override def namedProduct[H, T <: HList](head: JSONPickler[H], name: String, tail: JSONPickler[T]): JSONPickler[H :: T] =
+    def product[H, T <: HList](name: String, JPH: JSONPickler[H], JPT: JSONPickler[T]): JSONPickler[H :: T] =
       new JSONPickler[H :: T] {
         def pickle(l: H :: T): JsValue = {
-          val r = Json.obj(name -> head.pickle(l.head)) ++ tail.pickle(l.tail).asInstanceOf[JsObject]
+          val r = Json.obj(name -> JPH.pickle(l.head)) ++ JPT.pickle(l.tail).asInstanceOf[JsObject]
           JsObject(r.fields.filter(_._2 != JsNull))
         }
         def unpickle(v: JsValue): String \/ (H :: T) = for {
           o <- typecheck[JsObject](v, x => x)
           v <- o.value.get(name).cata(_.right, JsNull.right)
-          h <- head.unpickle(v)
-          t <- tail.unpickle(JsObject(o.fields.filter(_ != (name, v))))
+          h <- JPH.unpickle(v)
+          t <- JPT.unpickle(JsObject(o.fields.filter(_ != (name, v))))
         } yield h :: t
       }
 
-    def coproduct[L, R <: Coproduct](BL: => JSONPickler[L], BR: => JSONPickler[R]): JSONPickler[L :+: R] =
+    def emptyCoproduct: JSONPickler[CNil] = new JSONPickler[CNil] {
+      def pickle(nil: CNil) = Json.obj()
+      def unpickle(b: JsValue) = ???
+    }
+
+    def coproduct[L, R <: Coproduct](name: String, JPL: => JSONPickler[L], JPR: => JSONPickler[R]): JSONPickler[L :+: R] =
       new JSONPickler[L :+: R] {
         def pickle(c: L :+: R): JsValue = c match {
-          case Inl(l) => BL.pickle(l)
-          case Inr(r) => BR.pickle(r)
+          case Inl(l) => JPL.pickle(l)
+          case Inr(r) => JPR.pickle(r)
         }
         def unpickle(v: JsValue): String \/ (L :+: R) =
-          BL.unpickle(v).map(Inl[L, R](_)).orElse(BR.unpickle(v).map(r => Inr[L, R](r)))
+          JPL.unpickle(v).map(Inl[L, R](_)).orElse(JPR.unpickle(v).map(r => Inr[L, R](r)))
       }
 
-    def project[F, G](instance: => JSONPickler[G], to: F => G, from: G => F): JSONPickler[F] = new JSONPickler[F] {
-      def pickle(f: F): JsValue = instance.pickle(to(f))
-      def unpickle(v: JsValue): String \/ F = instance.unpickle(v).map(from)
-    }
+    def project[F, G](instance: => JSONPickler[G], to: F => G, from: G => F): JSONPickler[F] =
+      new JSONPickler[F] {
+        def pickle(f: F): JsValue = instance.pickle(to(f))
+        def unpickle(v: JsValue): String \/ F = instance.unpickle(v).map(from)
+      }
   }
 }

@@ -44,6 +44,10 @@ case class Insert[A, ID](cname: String)
 
   def mkResponse(params: RouteParams) = insert
 
+  def filter(f: RequestHeader => Boolean) = new Insert[A, ID](cname) {
+    override def _filter = { case rh => f(rh) }
+  }
+
   def insert = Action.async(BodyParsers.parse.json) { req =>
     val id = gen.generate
     fromRequest(id, req).fold(e => Future(BadRequest(e)), a => doInsert(a).map(mkAction(id)))

@@ -28,7 +28,7 @@ trait ParamsCollector[A] {
 
 object ParamsCollector {
 
-  implicit def apply[A]: ParamsCollector[A] = macro TypeClass.derive_impl[ParamsCollector, A]
+  implicit def apply[A]: ParamsCollector[A] = macro GenericMacros.deriveLabelledProductInstance[ParamsCollector, A]
 
   implicit def QueryStringParamsCollector[A](implicit binder: QueryStringBindable[A]): ParamsCollector[A] =
     new ParamsCollector[A] {
@@ -41,34 +41,17 @@ object ParamsCollector {
         pc.collect(params, name).fold(_ => None.right, Some(_).right)
     }
 
-  implicit def ParamsCollectorI: TypeClass[ParamsCollector] = new TypeClass[ParamsCollector] {
+  implicit def ParamsCollectorI: LabelledProductTypeClass[ParamsCollector] = new LabelledProductTypeClass[ParamsCollector] {
 
     def emptyProduct: ParamsCollector[HNil] = new ParamsCollector[HNil] {
       def collect(params: RouteParams, name: String): String \/ HNil = HNil.right
     }
-
-    def product[H, T <: HList](head: ParamsCollector[H], tail: ParamsCollector[T]): ParamsCollector[H :: T] =
-      new ParamsCollector[H :: T] {
-        def collect(params: RouteParams, name: String): String \/ (H :: T) = ???
-      }
-
-    override def namedProduct[H, T <: HList](PCH: ParamsCollector[H], name: String, PCT: ParamsCollector[T]): ParamsCollector[H :: T] =
+    override def product[H, T <: HList](name: String, PCH: ParamsCollector[H], PCT: ParamsCollector[T]): ParamsCollector[H :: T] =
       new ParamsCollector[H :: T] {
         def collect(params: RouteParams, _name: String): String \/ (H :: T) = for {
           h <- PCH.collect(params, name)
           t <- PCT.collect(params, "")
         } yield h :: t
-      }
-
-    override def namedField[F](instance: ParamsCollector[F], name: String): ParamsCollector[F] =
-      new ParamsCollector[F] {
-        def collect(params: RouteParams, name: String): String \/ F =
-          instance.collect(params, name)
-      }
-
-    def coproduct[L, R <: Coproduct](BL: => ParamsCollector[L], BR: => ParamsCollector[R]): ParamsCollector[L :+: R] =
-      new ParamsCollector[L :+: R] {
-        def collect(params: RouteParams, name: String): String \/ (L :+: R) = ???
       }
 
     def project[F, G](instance: => ParamsCollector[G], to: F => G, from: G => F): ParamsCollector[F] =

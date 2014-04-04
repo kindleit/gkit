@@ -35,6 +35,10 @@ class Find[A, B](cname: String, mkQuery: (B, Collection) => QueryBuilder)
 
   def mkResponse(params: RouteParams) = find(params)
 
+  def filter(f: RequestHeader => Boolean) = new Find[A, B](cname, mkQuery) {
+    override def _filter = { case rh => f(rh) }
+  }
+
   def find(params: RouteParams) =
     pc.collect(params).fold(e => Action(BadRequest(e)),
       p => mkAction(mkQuery(p, collection(cname)).cursor[A].collect[List]()))

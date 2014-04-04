@@ -43,6 +43,10 @@ case class Update[A, ID](cname: String)
 
   def mkResponse(params: RouteParams) = call(params.fromPath[ID]("id"))(update)
 
+  def filter(f: RequestHeader => Boolean) = new Update[A, ID](cname) {
+    override def _filter = { case rh => f(rh) }
+  }
+
   def update(id: ID) = Action.async(BodyParsers.parse.json) { req =>
     fromRequest(req).fold(e => Future(BadRequest(e)), a => doUpdate(id, a).map(mkAction))
   }

@@ -25,14 +25,17 @@ class Aggregate[R, P <: HList](cname: String, pipeline: P)
   , jsp: JSONPickler[R]
   ) extends Op {
 
-  import play.modules.gjson.JSON._, BSON._
+  import play.modules.gjson.JSON._
 
   implicit val ec = dbe.executionContext
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) =
-    call(aggregate)
+  def mkResponse(params: RouteParams) = aggregate
+
+  def filter(f: RequestHeader => Boolean) = new Aggregate[R, P](cname, pipeline) {
+    override def _filter = { case rh => f(rh) }
+  }
 
   def aggregate =
     mkAction(collection(cname).aggregate[R](pipeline))

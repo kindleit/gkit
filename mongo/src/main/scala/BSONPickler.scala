@@ -8,6 +8,8 @@ import reactivemongo.bson._
 
 import scala.language.experimental.macros
 
+import scala.reflect.macros.Context
+
 import scalaz.\/
 import scalaz.std.list._
 import scalaz.syntax.either._
@@ -21,7 +23,7 @@ trait BSONPickler[A] extends Pickler[A, BSONValue]
 
 object BSONPickler {
 
-  implicit def apply[A]: BSONPickler[A] = macro TypeClass.derive_impl[BSONPickler, A]
+  implicit def apply[A]: BSONPickler[A] = macro GenericMacros.deriveLabelledInstance[BSONPickler, A]
 
   implicit def StringBSONPickler: BSONPickler[String] = new BSONPickler[String] {
     def pickle(s: String): BSONValue = BSONString(s)
@@ -98,55 +100,46 @@ object BSONPickler {
       def unpickle(v: BSONValue): String \/ (FieldType[F, V] :: T) = ???
     }
 
-  implicit def BSONPicklerI: TypeClass[BSONPickler] = new TypeClass[BSONPickler] {
+  implicit def BSONPicklerI: LabelledTypeClass[BSONPickler] = new LabelledTypeClass[BSONPickler] {
 
     def emptyProduct: BSONPickler[HNil] = new BSONPickler[HNil] {
       def pickle(nil: HNil): BSONValue = BSONDocument()
       def unpickle(b: BSONValue): String \/ HNil = HNil.right
     }
 
-    def product[H, T <: HList](head: BSONPickler[H], tail: BSONPickler[T]): BSONPickler[H :: T] =
-      new BSONPickler[H :: T] {
-        def pickle(l: H :: T): BSONValue = ???
-        def unpickle(v: BSONValue): String \/ (H :: T) = ???
-      }
-
-    override def namedProduct[H, T <: HList](head: BSONPickler[H], name: String, tail: BSONPickler[T]): BSONPickler[H :: T] =
+    override def product[H, T <: HList](name: String, BPH: BSONPickler[H], BPT: BSONPickler[T]): BSONPickler[H :: T] =
       new BSONPickler[H :: T] {
         def pickle(l: H :: T): BSONValue = {
-          val r = BSONDocument(name -> head.pickle(l.head)) ++ tail.pickle(l.tail).asInstanceOf[BSONDocument]
+          val r = BSONDocument(name -> BPH.pickle(l.head)) ++ BPT.pickle(l.tail).asInstanceOf[BSONDocument]
           BSONDocument(r.elements.filter(_._2 != BSONUndefined))
         }
         def unpickle(v: BSONValue): String \/ (H :: T) = for {
           d <- typecheck[BSONDocument](v, x => x)
           v <- d.get(name).cata(_.right, BSONUndefined.right)
-          h <- head.unpickle(v)
-          t <- tail.unpickle(BSONDocument(d.elements.filter(_ != (name, v))))
+          h <- BPH.unpickle(v)
+          t <- BPT.unpickle(BSONDocument(d.elements.filter(_ != (name, v))))
         } yield h :: t
       }
 
-    override def namedField[F](instance: BSONPickler[F], name: String): BSONPickler[F] = new BSONPickler[F] {
-      def pickle(f: F): BSONValue = BSONDocument(name -> instance.pickle(f))
-      def unpickle(v: BSONValue): String \/ F = for {
-        d <- typecheck[BSONDocument](v, x => x)
-        v <- d.get(name).cata(_.right, BSONUndefined.right)
-        r <- instance.unpickle(v)
-      } yield r
+    def emptyCoproduct: BSONPickler[CNil] = new BSONPickler[CNil] {
+      def pickle(cnil: CNil): BSONValue = BSONDocument()
+      def unpickle(b: BSONValue): String \/ CNil = ???
     }
 
-    def coproduct[L, R <: Coproduct](BL: => BSONPickler[L], BR: => BSONPickler[R]): BSONPickler[L :+: R] =
+    def coproduct[L, R <: Coproduct](name: String, BPL: => BSONPickler[L], BPR: => BSONPickler[R]): BSONPickler[L :+: R] =
       new BSONPickler[L :+: R] {
         def pickle(c: L :+: R): BSONValue = c match {
-          case Inl(l) => BL.pickle(l)
-          case Inr(r) => BR.pickle(r)
+          case Inl(l) => BPL.pickle(l)
+          case Inr(r) => BPR.pickle(r)
         }
         def unpickle(v: BSONValue): String \/ (L :+: R) =
-          BL.unpickle(v).map(Inl[L, R](_)).orElse(BR.unpickle(v).map(r => Inr[L, R](r)))
+          BPL.unpickle(v).map(Inl[L, R](_)).orElse(BPR.unpickle(v).map(r => Inr[L, R](r)))
       }
 
-    def project[F, G](instance: => BSONPickler[G], to: F => G, from: G => F): BSONPickler[F] = new BSONPickler[F] {
-      def pickle(f: F): BSONValue = instance.pickle(to(f))
-      def unpickle(v: BSONValue): String \/ F = instance.unpickle(v).map(from)
-    }
+    def project[F, G](instance: => BSONPickler[G], to: F => G, from: G => F): BSONPickler[F] =
+      new BSONPickler[F] {
+        def pickle(f: F): BSONValue = instance.pickle(to(f))
+        def unpickle(v: BSONValue): String \/ F = instance.unpickle(v).map(from)
+      }
   }
 }

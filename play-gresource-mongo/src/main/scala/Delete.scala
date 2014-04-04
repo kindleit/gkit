@@ -24,6 +24,10 @@ case class Delete[ID](cname: String)
   lazy val route =
     Route("DELETE", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
+  def filter(f: RequestHeader => Boolean) = new Delete[ID](cname) {
+    override def _filter = { case rh => f(rh) }
+  }
+
   def mkResponse(params: RouteParams) =
     call(params.fromPath[ID]("id"))(delete)
 

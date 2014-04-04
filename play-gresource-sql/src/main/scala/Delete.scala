@@ -23,7 +23,7 @@ case class Delete[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[B
     db   : DB
   , idfs : Selector.Aux[A, B, Column[Int]]
   , r    : Row.Aux[A, C]
-  ) extends Op {
+  ) extends Op { self =>
 
   lazy val route =
     Route("DELETE", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))

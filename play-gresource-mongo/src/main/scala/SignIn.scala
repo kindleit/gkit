@@ -20,9 +20,9 @@ import scala.concurrent.Future
 
 case class SignIn[A, B]
   (
-    cname     : String
-  , mkQuery   : (A, Collection) => QueryBuilder
-  , mkSession : (B, Request[JsValue]) => Session
+    cname      : String
+  , mkQuery    : (A, Collection) => QueryBuilder
+  , withResult : (SimpleResult, B, Request[JsValue]) => SimpleResult
   )
   (implicit
     dbe  : DbEnv
@@ -47,8 +47,8 @@ case class SignIn[A, B]
   def fromRequest(req: Request[JsValue]): String \/ A =
     req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
 
-  def trySignIn(a: A) = mkQuery(a, collection(cname)).one[B]
+  def trySignIn(a: A): Future[Option[B]] = mkQuery(a, collection(cname)).one[B]
 
   def mkAction(req: Request[JsValue])(a: Option[B]) =
-    a.cata(x => Ok(toJSON(x)).withSession(mkSession(x, req)), Unauthorized)
+    a.cata(x => withResult(Ok(toJSON(x)), x, req), Unauthorized)
 }

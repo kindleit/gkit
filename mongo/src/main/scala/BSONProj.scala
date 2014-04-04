@@ -14,7 +14,7 @@ trait BSONProj[T] {
 
 object BSONProj {
 
-  implicit def apply[T]: BSONProj[T] = macro TypeClass.derive_impl[BSONProj, T]
+  implicit def apply[T]: BSONProj[T] = macro GenericMacros.deriveLabelledProductInstance[BSONProj, T]
 
   def default[T] = new BSONProj[T] { def proj = BSONDocument() }
 
@@ -30,15 +30,13 @@ object BSONProj {
     def proj = bp.proj
   }
 
-  implicit def BSONProjI: ProductTypeClass[BSONProj] = new ProductTypeClass[BSONProj] {
+  implicit def BSONProjI: LabelledProductTypeClass[BSONProj] = new LabelledProductTypeClass[BSONProj] {
 
     def emptyProduct = new BSONProj[HNil] {
       def proj = BSONDocument()
     }
 
-    def product[H, T <: HList](head: BSONProj[H], tail: BSONProj[T]) = ???
-
-    override def namedProduct[H, T <: HList](head: BSONProj[H], name: String, tail: BSONProj[T]) =
+    override def product[H, T <: HList](name: String, head: BSONProj[H], tail: BSONProj[T]) =
       new BSONProj[H :: T] {
         def proj = {
           val p = head.proj
@@ -47,11 +45,6 @@ object BSONProj {
             else BSONDocument(name -> p)
           h ++ tail.proj
         }
-      }
-
-    override def namedField[F](instance: BSONProj[F], name: String) =
-      new BSONProj[F] {
-        def proj = BSONDocument(name -> BSONInteger(1))
       }
 
     def project[F, G](instance: => BSONProj[G], to: F => G, from: G => F) =

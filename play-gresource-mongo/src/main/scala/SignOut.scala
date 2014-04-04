@@ -8,9 +8,9 @@ import play.core._
 
 import play.modules.gresource._
 
-object SignOut extends Op {
+case class SignOut(withResult: Result => Result) extends Op {
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = Action(Ok.withNewSession)
+  def mkResponse(params: RouteParams) = Action(withResult(Ok))
 }

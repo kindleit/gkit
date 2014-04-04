@@ -23,13 +23,17 @@ class Distinct[R, Q](cname: String, key: String, query: Q)
   , jsp: JSONPickler[R]
   ) extends Op {
 
-  import play.modules.gjson.JSON._, BSON._
+  import play.modules.gjson.JSON._
 
   implicit val ec = dbe.executionContext
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = call(distinct)
+  def mkResponse(params: RouteParams) = distinct
+
+  def filter(f: RequestHeader => Boolean) = new Distinct[R, Q](cname, key, query) {
+    override def _filter = { case rh => f(rh) }
+  }
 
   def distinct =
     mkAction(collection(cname).distinct[R](key, query))

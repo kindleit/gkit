@@ -25,7 +25,7 @@ trait ToStatement[A] {
 
 object ToStatement {
 
-  implicit def apply[A]: ToStatement[A] = macro TypeClass.derive_impl[ToStatement, A]
+  implicit def apply[A]: ToStatement[A] = macro GenericMacros.deriveInstance[ToStatement, A]
 
   implicit def BooleanToStatement: ToStatement[Boolean] = new ToStatement[Boolean] {
     def toStatement(b: Boolean, ps: PreparedStatement, index: Int): String \/ PreparedStatement =

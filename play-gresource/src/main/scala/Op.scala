@@ -15,7 +15,7 @@ abstract class Op extends Routes { self =>
 
   private var path: String = ""
 
-  val route: Route.ParamsExtractor
+  def route: Route.ParamsExtractor
 
   def mkResponse(params: RouteParams): Handler
 
@@ -32,14 +32,8 @@ abstract class Op extends Routes { self =>
 
   def _filter: PartialFunction[RequestHeader, Boolean] = { case _ => true }
 
-  def filter(f: RequestHeader => Boolean) = new Op {
-    val route = self.route
-    def mkResponse(params: RouteParams) = self.mkResponse(params)
-    override def _filter = { case rh => f(rh) }
-  }
-
-  def orElse(op: Op): Op = new Op {
-    val route = self.route
+  def orElse(op: Op) = new Op {
+    def route = self.route
     def mkResponse(params: RouteParams) = self.mkResponse(params)
     override def routes = new AbstractPartialFunction[RequestHeader, Handler] {
       op.setPrefix(prefix)

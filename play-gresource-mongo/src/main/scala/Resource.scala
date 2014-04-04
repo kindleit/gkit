@@ -41,19 +41,20 @@ object Resource {
       )
       =
       {
-        def mkOp(perm: RequestHeader => Boolean) =
-          Find[A](cname, findQuery).filter(perm) |:
-          FindOne[A, ID](cname).filter(perm)     |:
-          Insert[A, ID](cname).filter(perm)      |:
-          Update[A, ID](cname).filter(perm)      |:
-          Delete[ID](cname).filter(perm)
+        def mkOp(f: RequestHeader => Boolean) =
+          Find[A](cname, findQuery).filter(f) |:
+          FindOne[A, ID](cname).filter(f)     |:
+          Insert[A, ID](cname).filter(f)      |:
+          Update[A, ID](cname).filter(f)      |:
+          Delete[ID](cname).filter(f)
 
         new Op {
           val op = mkOp(_ => true)
           val route = op.route
           def mkResponse(params: RouteParams) = op.mkResponse(params)
+          def filter(f: RequestHeader => Boolean) = mkOp(f)
           override def routes = op.routes
-          override def filter(f: RequestHeader => Boolean) = mkOp(f)
+          override def _filter = op._filter
         }
       }
   }

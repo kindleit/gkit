@@ -25,7 +25,7 @@ case class FindOne[A, ID](cname: String)
   , idpb: PathBindable[ID]
   ) extends Op {
 
-  import play.modules.gjson.JSON._, BSON._
+  import play.modules.gjson.JSON._
 
   implicit val ec = dbe.executionContext
 
@@ -33,6 +33,10 @@ case class FindOne[A, ID](cname: String)
     Route("GET", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
   def mkResponse(params: RouteParams) = call(params.fromPath[ID]("id", None))(findOne)
+
+  def filter(f: RequestHeader => Boolean) = new FindOne[A, ID](cname) {
+    override def _filter = { case rh => f(rh) }
+  }
 
   def findOne(id: ID) = mkAction(collection(cname).find(IdQ(id)).one[A])
 

@@ -30,6 +30,7 @@ object build extends Build {
   val reactivemongo = "org.reactivemongo" %% "reactivemongo" % "0.10.0"
   val play          = "com.typesafe.play" %% "play"          % "2.2.2"     % "provided"
   val playJSON      = "com.typesafe.play" %% "play-json"     % "2.2.2"
+  val scalaReflect  = "org.scala-lang"    % "scala-reflect"  % "2.10.3"
 
   lazy val gkit = Project(
     id        = "gkit",
@@ -42,14 +43,14 @@ object build extends Build {
     base     = file("core"),
     settings = defaultSettings ++ Seq(
       name                := "gkit-core",
-      libraryDependencies ++= Seq(scalaz, shapeless)))
+      libraryDependencies ++= Seq(scalaReflect, scalaz, shapeless)))
 
   lazy val mongo = Project(
     id       = "mongo",
     base     = file("mongo"),
     settings = defaultSettings ++ Seq(
       name                := "gkit-mongo",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, reactivemongo)),
+      libraryDependencies ++= Seq(scalaReflect, jodaTime, jodaConvert, scalaz, shapeless, reactivemongo)),
     dependencies = Seq(core))
 
   lazy val sql = Project(
@@ -57,7 +58,7 @@ object build extends Build {
     base     = file("sql"),
     settings = defaultSettings ++ Seq(
       name                := "gkit-sql",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, scalazEffect, shapeless)),
+      libraryDependencies ++= Seq(scalaReflect, jodaTime, jodaConvert, scalaz, scalazEffect, shapeless)),
     dependencies = Seq(core))
 
   lazy val playGJSON = Project(
