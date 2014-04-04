@@ -106,8 +106,8 @@ object JSONPickler {
   implicit def JSONPicklerI: LabelledTypeClass[JSONPickler] = new LabelledTypeClass[JSONPickler] {
 
     def emptyProduct: JSONPickler[HNil] = new JSONPickler[HNil] {
-      def pickle(nil: HNil) = Json.obj()
-      def unpickle(b: JsValue) = HNil.right
+      def pickle(nil: HNil): JsValue = Json.obj()
+      def unpickle(b: JsValue): String \/ HNil = HNil.right
     }
 
     def product[H, T <: HList](name: String, JPH: JSONPickler[H], JPT: JSONPickler[T]): JSONPickler[H :: T] =
@@ -125,8 +125,8 @@ object JSONPickler {
       }
 
     def emptyCoproduct: JSONPickler[CNil] = new JSONPickler[CNil] {
-      def pickle(nil: CNil) = Json.obj()
-      def unpickle(b: JsValue) = ???
+      def pickle(nil: CNil): JsValue = Json.obj()
+      def unpickle(b: JsValue): String \/ CNil = "".left
     }
 
     def coproduct[L, R <: Coproduct](name: String, JPL: => JSONPickler[L], JPR: => JSONPickler[R]): JSONPickler[L :+: R] =
