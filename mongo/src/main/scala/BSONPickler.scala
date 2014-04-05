@@ -123,7 +123,7 @@ object BSONPickler {
 
     def emptyCoproduct: BSONPickler[CNil] = new BSONPickler[CNil] {
       def pickle(cnil: CNil): BSONValue = BSONDocument()
-      def unpickle(b: BSONValue): String \/ CNil = ???
+      def unpickle(b: BSONValue): String \/ CNil = "".left
     }
 
     def coproduct[L, R <: Coproduct](name: String, BPL: => BSONPickler[L], BPR: => BSONPickler[R]): BSONPickler[L :+: R] =
