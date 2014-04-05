@@ -1,7 +1,10 @@
 package gkit.mongo
 
+import play.api.libs.iteratee.Enumerator
+
 import reactivemongo.bson.BSONDocument
 
+import reactivemongo.api.QueryOpts
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.commands.Count
 import reactivemongo.core.commands.RawCommand
@@ -65,6 +68,15 @@ final class Collection(cname: String) {
   def runCommad[C](cmd: C)(implicit dbe: DbEnv, bp: BSONPickler[C]) = {
     implicit val ec = dbe.executionContext
     dbe.db.command(RawCommand(toBSONDoc(cmd)))
+  }
+
+  def tail[A] = new {
+    def apply[B](q: B, awaitData: Boolean = true)
+      (implicit dbe: DbEnv, abp: BSONPickler[A], bbp: BSONPickler[B]): Enumerator[A] = {
+        implicit val ec = dbe.executionContext
+        val opts = if (awaitData) QueryOpts().tailable.awaitData else QueryOpts().tailable
+        QueryBuilder(dbe, dbe.db(cname).find(toBSONDoc(q)).options(opts)).cursor[A].enumerate()
+      }
   }
 }
 
