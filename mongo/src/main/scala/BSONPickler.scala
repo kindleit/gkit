@@ -8,8 +8,6 @@ import reactivemongo.bson._
 
 import scala.language.experimental.macros
 
-import scala.reflect.macros.Context
-
 import scalaz.\/
 import scalaz.std.list._
 import scalaz.syntax.either._
@@ -23,7 +21,8 @@ trait BSONPickler[A] extends Pickler[A, BSONValue]
 
 object BSONPickler {
 
-  implicit def apply[A]: BSONPickler[A] = macro GenericMacros.deriveLabelledInstance[BSONPickler, A]
+  implicit def apply[A](implicit ev: LabelledTypeClass[BSONPickler]): BSONPickler[A] =
+    macro GenericMacros.deriveLabelledInstance[BSONPickler, A]
 
   implicit def StringBSONPickler: BSONPickler[String] = new BSONPickler[String] {
     def pickle(s: String): BSONValue = BSONString(s)
@@ -133,7 +132,7 @@ object BSONPickler {
           case Inr(r) => BPR.pickle(r)
         }
         def unpickle(v: BSONValue): String \/ (L :+: R) =
-          BPL.unpickle(v).map(Inl[L, R](_)).orElse(BPR.unpickle(v).map(r => Inr[L, R](r)))
+          BPR.unpickle(v).map(Inr[L, R](_)).orElse(BPL.unpickle(v).map(r => Inl[L, R](r)))
       }
 
     def project[F, G](instance: => BSONPickler[G], to: F => G, from: G => F): BSONPickler[F] =

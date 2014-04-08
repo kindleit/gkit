@@ -12,7 +12,8 @@ trait Generator[A] {
 
 object Generator {
 
-  implicit def apply[A]: Generator[A] = macro GenericMacros.deriveInstance[Generator, A]
+  implicit def apply[A](implicit ev: ProductTypeClass[Generator]): Generator[A] =
+    macro GenericMacros.deriveProductInstance[Generator, A]
 
   implicit def GeneratorI: ProductTypeClass[Generator] = new ProductTypeClass[Generator] {
 

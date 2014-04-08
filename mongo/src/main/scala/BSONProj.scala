@@ -14,7 +14,8 @@ trait BSONProj[T] {
 
 object BSONProj {
 
-  implicit def apply[T]: BSONProj[T] = macro GenericMacros.deriveLabelledProductInstance[BSONProj, T]
+  implicit def apply[T](implicit ev: LabelledProductTypeClass[BSONProj]): BSONProj[T] =
+    macro GenericMacros.deriveLabelledProductInstance[BSONProj, T]
 
   def default[T] = new BSONProj[T] { def proj = BSONDocument() }
 

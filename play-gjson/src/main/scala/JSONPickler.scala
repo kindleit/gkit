@@ -8,8 +8,6 @@ import org.joda.time.DateTime
 
 import scala.language.experimental.macros
 
-import scala.reflect.macros.Context
-
 import scalaz.\/
 import scalaz.std.list._
 import scalaz.syntax.either._
@@ -23,7 +21,8 @@ trait JSONPickler[A] extends Pickler[A, JsValue]
 
 object JSONPickler {
 
-  implicit def apply[T]: JSONPickler[T] = macro GenericMacros.deriveLabelledInstance[JSONPickler, T]
+  implicit def apply[A](implicit ev: LabelledTypeClass[JSONPickler]): JSONPickler[A] =
+    macro GenericMacros.deriveLabelledInstance[JSONPickler, A]
 
   implicit def StringJSONPickler: JSONPickler[String] = new JSONPickler[String] {
     def pickle(s: String): JsValue = JsString(s)
@@ -136,7 +135,7 @@ object JSONPickler {
           case Inr(r) => JPR.pickle(r)
         }
         def unpickle(v: JsValue): String \/ (L :+: R) =
-          JPL.unpickle(v).map(Inl[L, R](_)).orElse(JPR.unpickle(v).map(r => Inr[L, R](r)))
+          JPR.unpickle(v).map(Inr[L, R](_)).orElse(JPL.unpickle(v).map(r => Inl[L, R](r)))
       }
 
     def project[F, G](instance: => JSONPickler[G], to: F => G, from: G => F): JSONPickler[F] =

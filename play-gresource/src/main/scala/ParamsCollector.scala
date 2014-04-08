@@ -28,7 +28,8 @@ trait ParamsCollector[A] {
 
 object ParamsCollector {
 
-  implicit def apply[A]: ParamsCollector[A] = macro GenericMacros.deriveLabelledProductInstance[ParamsCollector, A]
+  implicit def apply[A](implicit ev: LabelledProductTypeClass[ParamsCollector]): ParamsCollector[A] =
+    macro GenericMacros.deriveLabelledProductInstance[ParamsCollector, A]
 
   implicit def QueryStringParamsCollector[A](implicit binder: QueryStringBindable[A]): ParamsCollector[A] =
     new ParamsCollector[A] {
