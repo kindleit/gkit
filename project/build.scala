@@ -24,13 +24,14 @@ object build extends Build {
 
   val jodaTime      = "joda-time"         %  "joda-time"     % "2.3"
   val jodaConvert   = "org.joda"          %  "joda-convert"  % "1.6"
-  val scalaz        = "org.scalaz"        %% "scalaz-core"   % "7.1.0-SNAPSHOT"
-  val scalazEffect  = "org.scalaz"        %% "scalaz-effect" % "7.1.0-SNAPSHOT"
+  val specs2        = "org.specs2"        %% "specs2"        % "2.3.10-scalaz-7.1.0-M6" % "test"
+  val scalaz        = "org.scalaz"        %% "scalaz-core"   % "7.1.0-M6"
+  val scalazEffect  = "org.scalaz"        %% "scalaz-effect" % "7.1.0-M6"
   val shapeless     = "com.chuusai"       %  "shapeless"     % "2.0.0-SNAPSHOT" cross CrossVersion.full changing()
   val reactivemongo = "org.reactivemongo" %% "reactivemongo" % "0.10.0"
-  val play          = "com.typesafe.play" %% "play"          % "2.2.2"     % "provided"
+  val play          = "com.typesafe.play" %% "play"          % "2.2.2"  % "provided"
   val playJSON      = "com.typesafe.play" %% "play-json"     % "2.2.2"
-  val scalaReflect  = "org.scala-lang"    % "scala-reflect"  % "2.10.3"
+  val scalaReflect  = "org.scala-lang"    %  "scala-reflect" % "2.10.3"
 
   lazy val gkit = Project(
     id        = "gkit",
@@ -50,7 +51,7 @@ object build extends Build {
     base     = file("mongo"),
     settings = defaultSettings ++ Seq(
       name                := "gkit-mongo",
-      libraryDependencies ++= Seq(scalaReflect, jodaTime, jodaConvert, scalaz, shapeless, reactivemongo)),
+      libraryDependencies ++= Seq(scalaReflect, jodaTime, jodaConvert, specs2, scalaz, shapeless, reactivemongo)),
     dependencies = Seq(core))
 
   lazy val sql = Project(
@@ -66,7 +67,7 @@ object build extends Build {
     base     = file("play-gjson"),
     settings = defaultSettings ++ Seq(
       name                := "play-gjson",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, playJSON)),
+      libraryDependencies ++= Seq(jodaTime, jodaConvert, specs2, scalaz, shapeless, playJSON)),
     dependencies = Seq(core))
 
   lazy val playGResource = Project(
