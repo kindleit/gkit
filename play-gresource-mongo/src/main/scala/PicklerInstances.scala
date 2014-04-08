@@ -12,11 +12,12 @@ import scalaz.syntax.std.option._
 
 trait PicklerInstances {
 
-  implicit def BSONObjectIDPickler: JSONPickler[BSONObjectID] = new JSONPickler[BSONObjectID] {
-    def pickle(boid: BSONObjectID): JsValue = Json.obj("$oid" -> boid.stringify)
-    def unpickle(v: JsValue): String \/ BSONObjectID = for {
-      jso <- typecheck[JsObject](v, x => x)
-      jss <- (jso \ "$oid").asOpt[JsString].cata(_.right, "string expected".left)
-    } yield BSONObjectID(jss.value)
-  }
+  implicit def BSONObjectIDPickler: JSONPickler[BSONObjectID] =
+    new JSONPickler[BSONObjectID] {
+      def pickle(boid: BSONObjectID): JsValue = Json.obj("$oid" -> boid.stringify)
+      def unpickle(v: JsValue, path: List[String]): String \/ BSONObjectID = for {
+        jso <- typecheck[JsObject](v, path)(identity)
+        jss <- (jso \ "$oid").asOpt[JsString].cata(_.right, "string expected".left)
+      } yield BSONObjectID(jss.value)
+    }
 }

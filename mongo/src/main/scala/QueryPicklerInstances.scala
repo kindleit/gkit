@@ -9,6 +9,6 @@ trait QueryPicklerInstances {
 
   implicit def EmptyQBSONPickler = new BSONPickler[EmptyQ.type] {
     def pickle(emptyQ: EmptyQ.type) = BSONDocument()
-    def unpickle(v: BSONValue) = EmptyQ.right
+    def unpickle(v: BSONValue, path: List[String]) = EmptyQ.right
   }
 }
