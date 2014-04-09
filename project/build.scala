@@ -22,16 +22,16 @@ object build extends Build {
         Some("releases"  at kitsd + "releases")
     })
 
-  val jodaTime      = "joda-time"         %  "joda-time"     % "2.3"
-  val jodaConvert   = "org.joda"          %  "joda-convert"  % "1.6"
-  val specs2        = "org.specs2"        %% "specs2"        % "2.3.10-scalaz-7.1.0-M6" % "test"
-  val scalaz        = "org.scalaz"        %% "scalaz-core"   % "7.1.0-M6"
-  val scalazEffect  = "org.scalaz"        %% "scalaz-effect" % "7.1.0-M6"
-  val shapeless     = "com.chuusai"       %  "shapeless"     % "2.0.0-SNAPSHOT" cross CrossVersion.full changing()
-  val reactivemongo = "org.reactivemongo" %% "reactivemongo" % "0.10.0"
-  val play          = "com.typesafe.play" %% "play"          % "2.2.2"  % "provided"
-  val playJSON      = "com.typesafe.play" %% "play-json"     % "2.2.2"
-  val scalaReflect  = "org.scala-lang"    %  "scala-reflect" % "2.10.3"
+  val jodaTime      = "joda-time"         %  "joda-time"        % "2.3"
+  val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.6"
+  val specs2        = "org.specs2"        %% "specs2"           % "2.3.10-scalaz-7.1.0-M6" % "test"
+  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0-M6"
+  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0-M6"
+  val shapeless     = "com.chuusai"       %  "shapeless_2.10.4" % "2.0.0"
+  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.10.0"
+  val play          = "com.typesafe.play" %% "play"             % "2.2.2"  % "provided"
+  val playJSON      = "com.typesafe.play" %% "play-json"        % "2.2.2"
+  val scalaReflect  = "org.scala-lang"    %  "scala-reflect"    % "2.10.3"
 
   lazy val gkit = Project(
     id        = "gkit",
