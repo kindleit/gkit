@@ -22,7 +22,7 @@ case class SignIn[A, B]
   (
     cname      : String
   , mkQuery    : (A, Collection) => QueryBuilder
-  , withResult : (SimpleResult, B, Request[JsValue]) => SimpleResult
+  , withResult : (Request[JsValue], B, SimpleResult) => Future[SimpleResult]
   )
   (implicit
     dbe  : DbEnv
@@ -41,7 +41,7 @@ case class SignIn[A, B]
   def mkResponse(params: RouteParams) = signIn
 
   def signIn = Action.async(BodyParsers.parse.json) { req =>
-    fromRequest(req).fold(e => Future(BadRequest(e)), a => trySignIn(a).map(mkAction(req)))
+    fromRequest(req).fold(e => Future(BadRequest(e)), a => trySignIn(a).flatMap(mkAction(req)))
   }
 
   def fromRequest(req: Request[JsValue]): String \/ A =
@@ -50,5 +50,5 @@ case class SignIn[A, B]
   def trySignIn(a: A): Future[Option[B]] = mkQuery(a, collection(cname)).one[B]
 
   def mkAction(req: Request[JsValue])(a: Option[B]) =
-    a.cata(x => withResult(Ok(toJSON(x)), x, req), Unauthorized)
+    a.cata(x => withResult(req, x, Ok(toJSON(x))), Future(Unauthorized))
 }
