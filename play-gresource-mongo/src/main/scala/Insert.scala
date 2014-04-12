@@ -5,7 +5,6 @@ import gkit.Generator
 import gkit.mongo._
 
 import play.api.libs.json._
-import play.api.mvc.Results._
 import play.api.mvc._
 
 import play.core.Router._
@@ -17,10 +16,10 @@ import play.modules.gresource._
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.core.commands.LastError
 
+import scala.concurrent.Future
+
 import scalaz._
 import Scalaz._
-
-import scala.concurrent.Future
 
 case class Insert[A, ID](cname: String)
   (implicit

@@ -30,7 +30,7 @@ case class SignIn[A, B]
   , bsp1 : BSONPickler[A]
   , bsp2 : BSONPickler[B]
   , jsp1 : JSONPickler[A]
-  ) extends Op {
+  ) extends Op[JsValue] {
 
   implicit val executionContext = dbe.executionContext
 
@@ -44,6 +44,6 @@ case class SignIn[A, B]
     def signIn(r: Request[JsValue])(a: A) =
       getQuery(collection(cname))(a).one[B].flatMap(_.cata(getResult(r), Future(Unauthorized)))
 
-    Action.async(parse.json)(r => getValue(r).fold(e => Future(BadRequest(e)), signIn(r)))
+    buildAction(parse.json)(r => getValue(r).fold(e => Future(BadRequest(e)), signIn(r)))
   }
 }

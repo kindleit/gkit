@@ -1,25 +1,31 @@
 package play.modules.gresource
 
-import play.api.mvc.Results._
 import play.api.mvc._
 
 import play.core.Router._
 import play.core._
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class Get[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[SimpleResult])
-  (implicit ec: ExecutionContext, pc: ParamsCollector[B]) extends Op {
+  (implicit ec: ExecutionContext, pc: ParamsCollector[B]) extends Op[A] {
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
   def executionContext = ec
 
-  def action(rp: RouteParams) =
-    pc.collect(rp).fold(
-      e => Action.async(bp)(_ => Future(BadRequest(e))),
-      p => Action.async(bp)(run(_)(p)))
+  def action(rp: RouteParams) = {
+
+    def buildResult(r: Request[A]) =
+      pc.collect(rp).fold(e => Future(BadRequest(e)), run(r))
+
+    buildAction(bp)(buildResult)
+  }
+
+  def filter(f: Request[A] => Future[Boolean]) =
+    new Get[A, B](bp)(run) {
+      override def accept(r: Request[A]) = f(r)
+    }
 }
 
 object Get {
