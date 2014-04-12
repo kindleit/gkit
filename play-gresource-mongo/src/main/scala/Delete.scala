@@ -10,6 +10,8 @@ import play.core._
 
 import play.modules.gresource._
 
+import scala.concurrent.Future
+
 import scalaz.syntax.std.boolean._
 
 case class Delete[ID](cname: String)
@@ -17,20 +19,25 @@ case class Delete[ID](cname: String)
     dbe: DbEnv
   , idp: BSONPickler[ID]
   , pb:  PathBindable[ID]
-  ) extends Op {
+  ) extends Op[AnyContent] {
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route =
     Route("DELETE", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
-  def filter(f: RequestHeader => Boolean) = new Delete[ID](cname) {
-    override def _filter = { case rh => f(rh) }
+  def action(rp: RouteParams) = {
+
+    def delete(id: ID) =
+      collection(cname).remove(IdQ(id)).map(le => (le.updated > 0).fold(Ok, NotFound))
+
+    def buildResult(r: Request[AnyContent]) =
+      rp.fromPath[ID]("id").value.fold(e => Future(BadRequest(e)), delete)
+
+    buildAction(parse.anyContent)(buildResult)
   }
 
-  def mkResponse(params: RouteParams) =
-    call(params.fromPath[ID]("id"))(delete)
-
-  def delete(id: ID) =
-    Action.async(collection(cname).remove(IdQ(id)).map(le => (le.updated > 0).fold(Ok, NotFound)))
+  def filter(f: Request[AnyContent] => Future[Boolean]) = new Delete[ID](cname) {
+    override def accept(r: Request[AnyContent]) = f(r)
+  }
 }

@@ -32,15 +32,17 @@ case class Update[A <: HList, B, C, D <: HList, E <: HList](table: Table[A], idf
   lazy val route =
     Route("PUT", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))
 
-  def mkResponse(params: RouteParams) = call(params.fromPath[Int]("id", None))(update)
+  def executionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
 
-  def update(id: Int) = Action(BodyParsers.parse.json) { req =>
-    fromJSON[E](req.body).bimap(BadRequest(_), doUpdate(id)).merge
-  }
-
-  def doUpdate(id: Int)(a: E) = {
-    val q = table.map(_ - idf).filter(_.get(idf) === id).update(a)
-    val k = q.map(_.fold(InternalServerError(_), ru => Ok(toJSON(ru))))
-    IO(db.getConnection).using(k).unsafePerformIO()
+  def action(rp: RouteParams) = {
+    def doUpdate(id: Int)(a: E) = {
+      val q = table.map(_ - idf).filter(_.get(idf) === id).update(a)
+      val k = q.map(_.fold(InternalServerError(_), ru => Ok(toJSON(ru))))
+      IO(db.getConnection).using(k).unsafePerformIO()
+    }
+    def update(id: Int) = Action(BodyParsers.parse.json) { req =>
+      fromJSON[E](req.body).bimap(BadRequest(_), doUpdate(id)).merge
+    }
+    rp.fromPath[Int]("id", None).value.fold(badRequest, update)
   }
 }

@@ -3,52 +3,47 @@ package play.modules.gresource.mongo
 import gkit.mongo._
 
 import play.api.libs.json._
-import play.api.mvc.Results._
+
 import play.api.mvc._
 
 import play.core.Router._
 import play.core._
 
+import play.modules.gjson.JSON._
 import play.modules.gjson._
 import play.modules.gresource._
+
+import scala.concurrent.Future
 
 import scalaz._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
 
-import scala.concurrent.Future
-
 case class SignIn[A, B]
   (
-    cname      : String
-  , mkQuery    : (A, Collection) => QueryBuilder
-  , withResult : (Request[JsValue], B, SimpleResult) => Future[SimpleResult]
+    cname     : String
+  , getQuery  : Collection => A => QueryBuilder
+  , getResult : Request[JsValue] => B => Future[SimpleResult]
   )
   (implicit
     dbe  : DbEnv
   , bsp1 : BSONPickler[A]
   , bsp2 : BSONPickler[B]
   , jsp1 : JSONPickler[A]
-  , jsp2 : JSONPickler[B]
   ) extends Op {
 
-  import play.modules.gjson.JSON._
-
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = signIn
+  def action(rp: RouteParams) = {
 
-  def signIn = Action.async(BodyParsers.parse.json) { req =>
-    fromRequest(req).fold(e => Future(BadRequest(e)), a => trySignIn(a).flatMap(mkAction(req)))
+    def getValue(r: Request[JsValue]) =
+      r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
+
+    def signIn(r: Request[JsValue])(a: A) =
+      getQuery(collection(cname))(a).one[B].flatMap(_.cata(getResult(r), Future(Unauthorized)))
+
+    Action.async(parse.json)(r => getValue(r).fold(e => Future(BadRequest(e)), signIn(r)))
   }
-
-  def fromRequest(req: Request[JsValue]): String \/ A =
-    req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
-
-  def trySignIn(a: A): Future[Option[B]] = mkQuery(a, collection(cname)).one[B]
-
-  def mkAction(req: Request[JsValue])(a: Option[B]) =
-    a.cata(x => withResult(req, x, Ok(toJSON(x))), Future(Unauthorized))
 }

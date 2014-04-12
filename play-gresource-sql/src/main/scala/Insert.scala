@@ -30,15 +30,16 @@ case class Insert[A <: HList, B, C, D <: HList, E <: HList](table: Table[A], idf
 
   lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = call(insert)
+  def executionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
 
-  def insert = Action(BodyParsers.parse.json) { req =>
-    fromJSON[E](req.body).bimap(BadRequest(_), doInsert).merge
-  }
-
-  def doInsert(a: E) = {
-    val q = table.map(_ - idf).insert(a)
-    val k = q.map(_.fold(InternalServerError(_), ru => Ok(toJSON(ru))))
-    IO(db.getConnection).using(k).unsafePerformIO()
+  def action(rp: RouteParams) = {
+    def doInsert(a: E) = {
+      val q = table.map(_ - idf).insert(a)
+      val k = q.map(_.fold(InternalServerError(_), ru => Ok(toJSON(ru))))
+      IO(db.getConnection).using(k).unsafePerformIO()
+    }
+    Action(BodyParsers.parse.json) { req =>
+      fromJSON[E](req.body).bimap(BadRequest(_), doInsert).merge
+    }
   }
 }

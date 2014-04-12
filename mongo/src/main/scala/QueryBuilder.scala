@@ -11,10 +11,13 @@ import scalaz.syntax.id._
 import scalaz.syntax.monoid._
 import scalaz.syntax.std.option._
 
-case class QueryBuilder(
-  dbe: DbEnv,
-  queryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter],
-  upTo: Int = Int.MaxValue) {
+case class QueryBuilder
+  (
+    dbe: DbEnv
+  , queryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter]
+  , offset: Int = 0
+  , upTo: Int = Int.MaxValue
+  ) {
 
   import BSON._
 
@@ -28,17 +31,16 @@ case class QueryBuilder(
   def sort[A](order: A)(implicit bp: BSONPickler[A]): QueryBuilder =
     copy(queryBuilder = queryBuilder.sort(toBSONDoc(order)))
 
-  def take(n: Int): QueryBuilder =
-    copy(queryBuilder = queryBuilder.options(QueryOpts(batchSizeN = n)), upTo = n)
+  def take(n: Int): QueryBuilder = copy(upTo = n)
 
-  def drop(n: Int): QueryBuilder =
-    copy(queryBuilder = queryBuilder.options(QueryOpts(skipN = n)))
+  def drop(n: Int): QueryBuilder = copy(offset = n)
 
   def skip(n: Int): QueryBuilder = drop(n)
 
   def limit(n: Int): QueryBuilder = take(n)
 
-  def cursor[A](implicit bp: BSONPickler[A]) = Cursor(dbe, queryBuilder.cursor[A], upTo)
+  def cursor[A](implicit bp: BSONPickler[A]) =
+    Cursor(dbe, queryBuilder.options(QueryOpts(skipN = offset, batchSizeN = upTo)).cursor[A], upTo)
 
   def one[A](implicit bp: BSONPickler[A]) = queryBuilder.one[A]
 }

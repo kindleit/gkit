@@ -23,22 +23,29 @@ case class FindOne[A, ID](cname: String)
   , jsp: JSONPickler[A]
   , idbp: BSONPickler[ID]
   , idpb: PathBindable[ID]
-  ) extends Op {
+  ) extends Op[AnyContent] {
 
   import play.modules.gjson.JSON._
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route =
     Route("GET", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
-  def mkResponse(params: RouteParams) = call(params.fromPath[ID]("id", None))(findOne)
+  def action(rp: RouteParams) = {
 
-  def filter(f: RequestHeader => Boolean) = new FindOne[A, ID](cname) {
-    override def _filter = { case rh => f(rh) }
+    def findOne(id: ID) = collection(cname).find(IdQ(id)).one[A]
+
+    def mapToStatus(f: Future[Option[A]]) = f.map(_.cata(a => Ok(toJSON(a)), NotFound))
+
+    def buildResult(r: Request[AnyContent]) =
+      rp.fromPath[ID]("id", None).value.fold(e => Future(BadRequest(e)), findOne _ andThen mapToStatus _)
+
+    buildAction(parse.anyContent)(buildResult)
   }
 
-  def findOne(id: ID) = mkAction(collection(cname).find(IdQ(id)).one[A])
-
-  def mkAction(r: Future[Option[A]]) = Action.async(r.map(_.cata(a => Ok(toJSON(a)), NotFound)))
+  def filter(f: Request[AnyContent] => Future[Boolean]) =
+    new FindOne[A, ID](cname) {
+      override def accept(r: Request[AnyContent]) = f(r)
+    }
 }

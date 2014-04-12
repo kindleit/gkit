@@ -9,21 +9,19 @@ import play.core._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 
-import scalaz.Endo
-
 class Post[A, B](bp: BodyParser[A])(f: A => A)(run: Request[A] => A => B => Future[SimpleResult])
   (implicit ec: ExecutionContext, pc: ParamsCollector[B]) extends Op {
 
   lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) =
-    pc.collect(params).fold(
+  def executionContext = ec
+
+  def action(rp: RouteParams) =
+    pc.collect(rp).fold(
       e => Action.async(bp)(_ => Future(BadRequest(e))),
       p => Action.async(bp)(r => run(r)(f(r.body))(p)))
 
-  def filter(g: RequestHeader => Boolean) = new Post[A, B](bp)(f)(run) {
-    override def _filter = { case rh => g(rh) }
-  }
+  def filter(g: RequestHeader => Future[Boolean]) = new Post[A, B](bp)(f)(run)
 
   def map(f: A => A) = new Post[A, B](bp)(f)(run)
 }

@@ -18,12 +18,7 @@ import reactivemongo.core.commands.LastError
 import scala.concurrent.Future
 
 import scalaz._
-import scalaz.std.string._
-import scalaz.syntax.either._
-import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.option._
+import Scalaz._
 
 case class Update[A, ID](cname: String)
   (implicit
@@ -32,33 +27,40 @@ case class Update[A, ID](cname: String)
   , jsp: JSONPickler[A]
   , idp: BSONPickler[ID]
   , pb:  PathBindable[ID]
-  ) extends Op {
+  ) extends Op[JsValue] {
 
   import play.modules.gjson.JSON._
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route =
     Route("PUT", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
-  def mkResponse(params: RouteParams) = call(params.fromPath[ID]("id"))(update)
+  def action(rp: RouteParams) = {
 
-  def filter(f: RequestHeader => Boolean) = new Update[A, ID](cname) {
-    override def _filter = { case rh => f(rh) }
+    def getId = rp.fromPath[ID]("id").value
+
+    def getValue(r: Request[JsValue]): String \/ A =
+      r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
+
+    def update(id: ID)(a: A) = {
+      val b = BSONDocument(BSON.toBSONDoc(a).elements.filter(_._1 != "_id"))
+      collection(cname).update(IdQ(id), Set(b))
+    }
+
+    def getStatus(fle: Future[LastError]) =
+      fle.map(le => le.ok.fold(Ok, InternalServerError(~le.errMsg)))
+
+    def f(r: Request[JsValue])(id: ID) =
+      getValue(r).fold(e => Future(BadRequest(e)), update(id) _ >>> getStatus _)
+
+    def buildResult(r: Request[JsValue]) =
+      getId.fold(e => Future(BadRequest(e)), f(r))
+
+    buildAction(parse.json)(buildResult)
   }
 
-  def update(id: ID) = Action.async(BodyParsers.parse.json) { req =>
-    fromRequest(req).fold(e => Future(BadRequest(e)), a => doUpdate(id, a).map(mkAction))
+  def filter(f: Request[JsValue] => Future[Boolean]) = new Update[A, ID](cname) {
+    override def accept(r: Request[JsValue]) = f(r)
   }
-
-  def fromRequest(req: Request[JsValue]): String \/ A =
-    req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
-
-  def doUpdate(id: ID, a: A) = {
-    val b = BSONDocument(BSON.toBSONDoc(a).elements.filter(_._1 != "_id"))
-    collection(cname).update(IdQ(id), Set(b))
-  }
-
-  def mkAction(le: LastError) =
-    le.ok.fold(Ok, InternalServerError(~le.errMsg))
 }

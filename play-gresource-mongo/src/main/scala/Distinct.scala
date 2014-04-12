@@ -15,42 +15,45 @@ import scala.concurrent.Future
 
 import scalaz._
 
-class Distinct[R, Q](cname: String, key: String, query: Q)
+class Distinct[A, B](cname: String, key: String, query: B)
   (implicit
     dbe: DbEnv
-  , rbp: BSONPickler[R]
-  , qbp: BSONPickler[Q]
-  , jsp: JSONPickler[R]
-  ) extends Op {
+  , rbp: BSONPickler[A]
+  , qbp: BSONPickler[B]
+  , jsp: JSONPickler[A]
+  ) extends Op[AnyContent] {
 
   import play.modules.gjson.JSON._
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = distinct
+  def action(rp: RouteParams) = {
 
-  def filter(f: RequestHeader => Boolean) = new Distinct[R, Q](cname, key, query) {
-    override def _filter = { case rh => f(rh) }
+    def buildResult(r: Request[AnyContent]) = {
+      val f = collection(cname).distinct[A](key, query)
+      f.map(_.fold(e => InternalServerError(e), as => Ok(toJSON(as))))
+    }
+
+    buildAction(parse.anyContent)(buildResult)
   }
 
-  def distinct =
-    mkAction(collection(cname).distinct[R](key, query))
-
-  def mkAction(r: Future[String \/ R]) =
-    Action.async(r.map(_.fold(e => InternalServerError(e), as => Ok(toJSON(as)))))
+  def filter(f: Request[AnyContent] => Future[Boolean]) =
+    new Distinct[A, B](cname, key, query) {
+      override def accept(r: Request[AnyContent]) = f(r)
+    }
 }
 
 object Distinct {
-  def apply[R] = new {
-    def apply[Q](cname: String, key: String, query: Q = EmptyQ)
+  def apply[A] = new {
+    def apply[B](cname: String, key: String, query: B = EmptyQ)
     (implicit
       dbe: DbEnv
-    , rbp: BSONPickler[R]
-    , bsp: BSONPickler[Q]
-    , jsp: JSONPickler[R]
+    , rbp: BSONPickler[A]
+    , bsp: BSONPickler[B]
+    , jsp: JSONPickler[A]
     )
-    = new Distinct[R, Q](cname, key, query)
+    = new Distinct[A, B](cname, key, query)
   }
 }

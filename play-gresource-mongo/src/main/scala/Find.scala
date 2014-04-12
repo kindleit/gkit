@@ -18,50 +18,72 @@ import scala.concurrent.Future
 import scalaz._
 import scalaz.syntax.std.option._
 
-class Find[A, B](cname: String, mkQuery: (B, Collection) => QueryBuilder)
+import shapeless._
+import shapeless.syntax.singleton._
+
+class Find[A, B, C]
+  (
+    cname: String
+  , getQuery: (Collection, B) => QueryBuilder
+  , getCountQuery: B => C
+  )
   (implicit
     dbe: DbEnv
-  , bsp: BSONPickler[A]
+  , bsp1: BSONPickler[A]
+  , bsp2: BSONPickler[C]
   , jsp: JSONPickler[A]
   , bspj: BSONProj[A]
   , pc: ParamsCollector[B]
-  ) extends Op {
+  ) extends Op[AnyContent] {
 
   import play.modules.gjson.JSON._
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = find(params)
+  def action(rp: RouteParams) = {
 
-  def filter(f: RequestHeader => Boolean) = new Find[A, B](cname, mkQuery) {
-    override def _filter = { case rh => f(rh) }
+    def find(p: B) = for {
+      d <- getQuery(collection(cname), p).cursor[A].collect[List]()
+      c <- collection(cname).count(getCountQuery(p))
+    } yield d.map(xs => ("data" ->> xs :: ("meta" ->> ("count" ->> c :: HNil)) :: HNil))
+
+    def buildResult(r: Request[AnyContent]) =
+      pc.collect(rp).fold(
+        e => Future(BadRequest(e)),
+        p => find(p).map(_.fold(InternalServerError(_), x => Ok(toJSON(x)))))
+
+    buildAction(parse.anyContent)(buildResult)
   }
 
-  def find(params: RouteParams) =
-    pc.collect(params).fold(e => Action(BadRequest(e)),
-      p => mkAction(mkQuery(p, collection(cname)).cursor[A].collect[List]()))
-
-  def mkAction(r: Future[String \/ List[A]]) =
-    Action.async(r.map(_.fold(InternalServerError(_), as => Ok(toJSON(as)))))
+  def filter(f: Request[AnyContent] => Future[Boolean]) =
+    new Find[A, B, C](cname, getQuery, getCountQuery) {
+      override def accept(r: Request[AnyContent]) = f(r)
+    }
 }
 
 object Find {
   def apply[A] = new {
-    def apply[B](cname: String, mkQuery: (B, Collection) => QueryBuilder)
+    def apply[B, C]
+      (
+        cname: String
+      , getQuery: (Collection, B) => QueryBuilder
+      , getCountQuery: B => C
+      )
       (implicit
         dbe: DbEnv
-      , bsp: BSONPickler[A]
+      , bsp1: BSONPickler[A]
+      , bsp2: BSONPickler[C]
       , jsp: JSONPickler[A]
       , bspj: BSONProj[A]
       , pc: ParamsCollector[B]
       )
-      = new Find[A, B](cname, mkQuery)
+      = new Find[A, B, C](cname, getQuery, getCountQuery)
   }
 
   case class DefaultParams(skip: Option[Int], limit: Option[Int])
 
   def mkDefaultQry(implicit dbe: DbEnv) =
-    (dp: DefaultParams, c: Collection) => c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10)
+    (c: Collection, dp: DefaultParams) => c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10)
 }

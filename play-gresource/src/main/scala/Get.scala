@@ -14,8 +14,10 @@ class Get[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[SimpleResult])
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) =
-    pc.collect(params).fold(
+  def executionContext = ec
+
+  def action(rp: RouteParams) =
+    pc.collect(rp).fold(
       e => Action.async(bp)(_ => Future(BadRequest(e))),
       p => Action.async(bp)(run(_)(p)))
 }

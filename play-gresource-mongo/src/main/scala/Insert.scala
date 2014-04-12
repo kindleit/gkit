@@ -18,12 +18,7 @@ import reactivemongo.bson.BSONObjectID
 import reactivemongo.core.commands.LastError
 
 import scalaz._
-import scalaz.std.string._
-import scalaz.syntax.either._
-import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.option._
+import Scalaz._
 
 import scala.concurrent.Future
 
@@ -34,30 +29,34 @@ case class Insert[A, ID](cname: String)
   , jsp1 : JSONPickler[A]
   , jsp2 : JSONPickler[ID]
   , gen  : Generator[ID]
-  ) extends Op {
+  ) extends Op[JsValue] {
 
   import play.modules.gjson.JSON._
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = insert
+  def action(rp: RouteParams) = {
 
-  def filter(f: RequestHeader => Boolean) = new Insert[A, ID](cname) {
-    override def _filter = { case rh => f(rh) }
+    def getValue(r: Request[JsValue]): String \/ A =
+      r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
+
+    def insert(id: ID)(a: A) = collection(cname).insert(a)
+
+    def getStatus(id: ID)(f: Future[LastError]) =
+      f.map(le => le.ok.fold(Ok(toJSON(id)), InternalServerError(~le.errMsg)))
+
+    def buildResult(r: Request[JsValue]) = {
+      val id = gen.generate
+      getValue(r).fold(e => Future(BadRequest(e)), insert(id) _ >>> getStatus(id) _)
+    }
+
+    buildAction(parse.json)(buildResult)
   }
 
-  def insert = Action.async(BodyParsers.parse.json) { req =>
-    val id = gen.generate
-    fromRequest(id, req).fold(e => Future(BadRequest(e)), a => doInsert(a).map(mkAction(id)))
-  }
-
-  def fromRequest(id: ID, req: Request[JsValue]): String \/ A =
-    req.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
-
-  def doInsert(a: A) = collection(cname).insert(a)
-
-  def mkAction(id: ID)(le: LastError) =
-    le.ok.fold(Ok(toJSON(id)), InternalServerError(~le.errMsg))
+  def filter(f: Request[JsValue] => Future[Boolean]) =
+    new Insert[A, ID](cname) {
+      override def accept(r: Request[JsValue]) = f(r)
+    }
 }

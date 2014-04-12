@@ -1,40 +1,44 @@
 package play.modules.gresource
 
 import play.api.mvc._
-import play.api.mvc.Results._
+
+import play.api.http._
 
 import play.core.Router._
 import play.core._
 
 import scala.runtime.AbstractPartialFunction
 
-import scalaz.std.partialFunction._
-import scalaz.syntax.arrow._
+import scala.concurrent.{ExecutionContext, Future}
 
-abstract class Op extends Routes { self =>
+import scalaz._
+import Scalaz._
+
+abstract class Op[A] extends Routes with Results with BodyParsers with Status { self =>
 
   private var path: String = ""
 
+  implicit def executionContext: ExecutionContext
+
   def route: Route.ParamsExtractor
 
-  def mkResponse(params: RouteParams): Handler
+  def action(rp: RouteParams): Handler
 
-  def handle: PartialFunction[(RouteParams, Boolean), Handler] = {
-    case (params, true) => mkResponse(params)
-    case (_, false)     => Action(Forbidden)
+  def buildAction(bp: BodyParser[A])(f: Request[A] => Future[SimpleResult]): Action[A] =
+    Action.async(bp)(r => accept(r).flatMap(_.fold(f(r), Future(Forbidden))))
+
+  def accept(r: Request[A]): Future[Boolean] = Future(true)
+
+  def routes = params(route) >>> (action _).arrow[PartialFunction]
+
+  def params(pe: Route.ParamsExtractor): PartialFunction[RequestHeader, RouteParams] = {
+    case pe(rp) => rp
   }
 
-  def routes = (extractParams(route) &&& _filter) >>> handle
-
-  def extractParams(pe: Route.ParamsExtractor): PartialFunction[RequestHeader, RouteParams] = {
-    case pe(params) => params
-  }
-
-  def _filter: PartialFunction[RequestHeader, Boolean] = { case _ => true }
-
-  def orElse(op: Op) = new Op {
+  def orElse[B](op: Op[B]) = new Op[A] {
+    def executionContext = self.executionContext
     def route = self.route
-    def mkResponse(params: RouteParams) = self.mkResponse(params)
+    def action(rp: RouteParams) = self.action(rp)
     override def routes = new AbstractPartialFunction[RequestHeader, Handler] {
       op.setPrefix(prefix)
       self.setPrefix(prefix)
@@ -45,7 +49,7 @@ abstract class Op extends Routes { self =>
     }
   }
 
-  def |:(op: Op) = orElse(op)
+  def |:[B](op: Op[B]) = orElse(op)
 
   def prefix = path
 

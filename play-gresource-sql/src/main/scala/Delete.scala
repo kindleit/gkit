@@ -25,11 +25,13 @@ case class Delete[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[B
   , r    : Row.Aux[A, C]
   ) extends Op { self =>
 
+  def executionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
+
   lazy val route =
     Route("DELETE", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))
 
-  def mkResponse(params: RouteParams) =
-    call(params.fromPath[Int]("id", None))(delete)
+  def action(rp: RouteParams) =
+    rp.fromPath[Int]("id", None).value.fold(e => Action(BadRequest(e)), delete)
 
   def delete(id: Int) = Action { _ =>
     val q = table.filter(_.get(idf) === id).delete

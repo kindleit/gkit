@@ -6,10 +6,9 @@ import play.modules.gjson._
 import play.modules.gresource._
 
 import play.api.mvc._
-import play.api.mvc.Results._
 
-import play.core._
 import play.core.Router._
+import play.core._
 
 import scala.concurrent.Future
 
@@ -17,42 +16,45 @@ import scalaz._
 
 import shapeless._
 
-class Aggregate[R, P <: HList](cname: String, pipeline: P)
+class Aggregate[A, B <: HList](cname: String, pipeline: B)
   (implicit
     dbe: DbEnv
-  , rbp: BSONPickler[R]
-  , qbp: BSONPickler[P]
-  , jsp: JSONPickler[R]
-  ) extends Op {
+  , rbp: BSONPickler[A]
+  , qbp: BSONPickler[B]
+  , jsp: JSONPickler[A]
+  ) extends Op[AnyContent] {
 
   import play.modules.gjson.JSON._
 
-  implicit val ec = dbe.executionContext
+  implicit val executionContext = dbe.executionContext
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-  def mkResponse(params: RouteParams) = aggregate
+  def action(rp: RouteParams) = {
 
-  def filter(f: RequestHeader => Boolean) = new Aggregate[R, P](cname, pipeline) {
-    override def _filter = { case rh => f(rh) }
+    def buildResult(r: Request[AnyContent]) = {
+      val f = collection(cname).aggregate[A](pipeline)
+      f.map(_.fold(InternalServerError(_), as => Ok(toJSON(as))))
+    }
+
+    buildAction(parse.anyContent)(buildResult)
   }
 
-  def aggregate =
-    mkAction(collection(cname).aggregate[R](pipeline))
-
-  def mkAction(r: Future[String \/ R]) =
-    Action.async(r.map(_.fold(e => InternalServerError(e), as => Ok(toJSON(as)))))
+  def filter(f: Request[AnyContent] => Future[Boolean]) =
+    new Aggregate[A, B](cname, pipeline) {
+      override def accept(r: Request[AnyContent]) = f(r)
+    }
 }
 
 object Aggregate {
-  def apply[R] = new {
-    def apply[P <: HList](cname: String, pipeline: P)
+  def apply[A] = new {
+    def apply[B <: HList](cname: String, pipeline: B)
     (implicit
       dbe: DbEnv
-    , rbp: BSONPickler[R]
-    , bsp: BSONPickler[P]
-    , jsp: JSONPickler[R]
+    , rbp: BSONPickler[A]
+    , bsp: BSONPickler[B]
+    , jsp: JSONPickler[A]
     )
-    = new Aggregate[R, P](cname, pipeline)
+    = new Aggregate[A, B](cname, pipeline)
   }
 }

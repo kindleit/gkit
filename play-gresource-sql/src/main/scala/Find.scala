@@ -31,8 +31,15 @@ object Find {
 
       lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-      def mkResponse(params: RouteParams) =
-        call(params.fromQuery[Int]("skip", Some(0)), params.fromQuery[Int]("limit", Some(10)))(find)
+      def executionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
+
+      def action(rp: RouteParams) = {
+        val r = for {
+          skip <- rp.fromQuery[Int]("skip", Some(0)).value.right
+          limit <- rp.fromQuery[Int]("limit", Some(10)).value.right
+        } yield find(skip, limit)
+        r.left.map(badRequest).merge
+      }
 
       def find(skip: Int, limit: Int) = Action { _ =>
         val q = table.map(a => a).drop(skip).take(limit).toList
@@ -53,11 +60,16 @@ object Find {
     {
       lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
-      def mkResponse(params: RouteParams) =
-        call(
-          params.fromQuery[Int]("pid", None),
-          params.fromQuery[Int]("skip", Some(0)),
-          params.fromQuery[Int]("limit", Some(10)))(find)
+      def executionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
+
+      def action(rp: RouteParams) = {
+        val r = for {
+          pid <- rp.fromQuery[Int]("pid", None).value.right
+          skip <- rp.fromQuery[Int]("skip", Some(0)).value.right
+          limit <- rp.fromQuery[Int]("limit", Some(10)).value.right
+        } yield find(pid, skip, limit)
+        r.left.map(badRequest).merge
+      }
 
       def find(pid: Int, skip: Int, limit: Int) = Action { _ =>
         val q = table.filter(_.get(pidf) === pid).drop(skip).take(limit).toList
@@ -79,7 +91,10 @@ case class FindOne[A <: HList, B, C <: HList](table: Table[A], idf: Witness.Aux[
   lazy val route =
     Route("GET", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", "[0-9]+", false))))
 
-  def mkResponse(params: RouteParams) = call(params.fromPath[Int]("id", None))(findOne)
+  def executionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
+
+  def action(rp: RouteParams) =
+    rp.fromPath[Int]("id", None).value.fold(badRequest, findOne)
 
   def findOne(id: Int) = Action { _ =>
     val q = table.filter(_.get(idf) === id).first
