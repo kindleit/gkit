@@ -75,7 +75,8 @@ object build extends Build {
     base     = file("play-gresource"),
     settings = defaultSettings ++ Seq(
       name                := "play-gresource",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, play)))
+      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, shapeless, play)),
+    dependencies = Seq(core, playGJSON))
 
   lazy val playGResourceMongo = Project(
     id       = "play-gresource-mongo",
