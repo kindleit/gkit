@@ -32,8 +32,8 @@ object Resource {
     def apply[B, C]
       (
         cname: String
-      , mkQuery: (Request[AnyContent], Collection, B) => QueryBuilder
-      , mkCountQuery: (Request[AnyContent], B) => C
+      , mkQuery: (Request[AnyContent], Collection, B) => Future[QueryBuilder]
+      , mkCountQuery: (Request[AnyContent], B) => Future[C]
       )
       (implicit
         dbe   : DbEnv

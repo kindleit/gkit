@@ -24,8 +24,8 @@ import shapeless.syntax.singleton._
 class Find[A, B, C]
   (
     cname: String
-  , mkQuery: (Request[AnyContent], Collection, B) => QueryBuilder
-  , mkCountQuery: (Request[AnyContent], B) => C
+  , mkQuery: (Request[AnyContent], Collection, B) => Future[QueryBuilder]
+  , mkCountQuery: (Request[AnyContent], B) => Future[C]
   )
   (implicit
     dbe: DbEnv
@@ -45,8 +45,8 @@ class Find[A, B, C]
   def action(rp: RouteParams) = {
 
     def find(r: Request[AnyContent], p: B) = for {
-      d <- mkQuery(r, collection(cname), p).cursor[A].collect[List]()
-      c <- collection(cname).count(mkCountQuery(r, p))
+      d <- mkQuery(r, collection(cname), p).flatMap(_.cursor[A].collect[List]())
+      c <- mkCountQuery(r, p).flatMap(collection(cname).count(_))
     } yield d.map(xs => ("data" ->> xs :: ("meta" ->> ("count" ->> c :: HNil)) :: HNil))
 
     def buildResult(r: Request[AnyContent]) =
@@ -68,8 +68,8 @@ object Find {
     def apply[B, C]
       (
         cname: String
-      , mkQuery: (Request[AnyContent], Collection, B) => QueryBuilder
-      , mkCountQuery: (Request[AnyContent], B) => C
+      , mkQuery: (Request[AnyContent], Collection, B) => Future[QueryBuilder]
+      , mkCountQuery: (Request[AnyContent], B) => Future[C]
       )
       (implicit
         dbe: DbEnv
@@ -84,11 +84,15 @@ object Find {
 
   case class DefaultParams(skip: Option[Int], limit: Option[Int])
 
-  def mkDefaultQry(implicit dbe: DbEnv) =
+  def mkDefaultQry(implicit dbe: DbEnv) = {
+    implicit val ec = dbe.executionContext
     (r: Request[AnyContent], c: Collection, dp: DefaultParams) => {
-      c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10)
+      Future(c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10))
     }
+  }
 
-  def mkDefaultCntQry(implicit dbe: DbEnv) =
-    (_: Request[AnyContent], _:Find.DefaultParams) => EmptyQ
+  def mkDefaultCntQry(implicit dbe: DbEnv) = {
+    implicit val ec = dbe.executionContext
+    (_: Request[AnyContent], _:Find.DefaultParams) => Future(EmptyQ)
+  }
 }
