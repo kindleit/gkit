@@ -24,8 +24,7 @@ import shapeless.syntax.singleton._
 class Find[A, B, C]
   (
     cname: String
-  , mkQuery: (Request[AnyContent], Collection, B) => Future[QueryBuilder]
-  , mkCountQuery: (Request[AnyContent], B) => Future[C]
+  , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
   )
   (implicit
     dbe: DbEnv
@@ -45,8 +44,9 @@ class Find[A, B, C]
   def action(rp: RouteParams) = {
 
     def find(r: Request[AnyContent], p: B) = for {
-      d <- mkQuery(r, collection(cname), p).flatMap(_.cursor[A].collect[List]())
-      c <- mkCountQuery(r, p).flatMap(collection(cname).count(_))
+      (q, a) <- mkQuery(r, collection(cname), p)
+      d      <- q.cursor[A].collect[List]()
+      c      <- collection(cname).count(a)
     } yield d.map(xs => ("data" ->> xs :: ("meta" ->> ("count" ->> c :: HNil)) :: HNil))
 
     def buildResult(r: Request[AnyContent]) =
@@ -58,7 +58,7 @@ class Find[A, B, C]
   }
 
   def filter(f: Request[AnyContent] => Future[Boolean]) =
-    new Find[A, B, C](cname, mkQuery, mkCountQuery) {
+    new Find[A, B, C](cname, mkQuery) {
       override def accept(r: Request[AnyContent]) = f(r)
     }
 }
@@ -68,8 +68,7 @@ object Find {
     def apply[B, C]
       (
         cname: String
-      , mkQuery: (Request[AnyContent], Collection, B) => Future[QueryBuilder]
-      , mkCountQuery: (Request[AnyContent], B) => Future[C]
+      , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
       )
       (implicit
         dbe: DbEnv
@@ -79,7 +78,7 @@ object Find {
       , bspj: BSONProj[A]
       , pc: ParamsCollector[B]
       )
-      = new Find[A, B, C](cname, mkQuery, mkCountQuery)
+      = new Find[A, B, C](cname, mkQuery)
   }
 
   case class DefaultParams(skip: Option[Int], limit: Option[Int])
@@ -87,12 +86,7 @@ object Find {
   def mkDefaultQry(implicit dbe: DbEnv) = {
     implicit val ec = dbe.executionContext
     (r: Request[AnyContent], c: Collection, dp: DefaultParams) => {
-      Future(c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10))
+      Future((c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10), EmptyQ))
     }
-  }
-
-  def mkDefaultCntQry(implicit dbe: DbEnv) = {
-    implicit val ec = dbe.executionContext
-    (_: Request[AnyContent], _:Find.DefaultParams) => Future(EmptyQ)
   }
 }
