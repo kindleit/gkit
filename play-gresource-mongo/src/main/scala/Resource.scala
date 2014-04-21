@@ -26,14 +26,14 @@ object Resource {
     , idbsp : BSONPickler[ID]
     , idpb  : PathBindable[ID]
     )
-    = withFindQuery[A, ID](cname, Find.mkDefaultQry, (_:Find.DefaultParams) => EmptyQ)
+    = withFindQuery[A, ID](cname, Find.mkDefaultQry, Find.mkDefaultCntQry)
 
   def withFindQuery[A, ID] = new {
     def apply[B, C]
       (
         cname: String
-      , getQuery: (Collection, B) => QueryBuilder
-      , getCountQuery: B => C
+      , mkQuery: (Request[AnyContent], Collection, B) => QueryBuilder
+      , mkCountQuery: (Request[AnyContent], B) => C
       )
       (implicit
         dbe   : DbEnv
@@ -50,7 +50,7 @@ object Resource {
       =
       {
         def mkOp(f: RequestHeader => Future[Boolean]) =
-          Find[A](cname, getQuery, getCountQuery).filter(f) |:
+          Find[A](cname, mkQuery, mkCountQuery).filter(f) |:
           FindOne[A, ID](cname).filter(f)     |:
           Insert[A, ID](cname).filter(f)      |:
           Update[A, ID](cname).filter(f)      |:
