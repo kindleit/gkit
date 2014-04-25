@@ -97,8 +97,13 @@ object JSONPickler {
         case s: Symbol => s.toString.drop(1)
         case a: Any    => a.toString
       }
-      def pickle(l: FieldType[F, V] :: T): JsValue =
-        Json.obj(name -> hjp.pickle(l.head:V)) ++ tjp.pickle(l.tail).asInstanceOf[JsObject]
+      def pickle(l: FieldType[F, V] :: T): JsValue = {
+        val o = Json.obj(name -> hjp.pickle(l.head:V))
+        tjp.pickle(l.tail) match {
+          case a: JsArray => Json.arr(o) ++ a
+          case x => o ++ x.asInstanceOf[JsObject]
+        }
+      }
       def unpickle(v: JsValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
         o <- typecheck[JsObject](v, path)(identity)
         v <- o.value.get(name).cata(_.right, s"""field `${(path :+ name).mkString(".")}' not found""".left)

@@ -105,8 +105,13 @@ object BSONPickler {
         case s: Symbol => s.toString.drop(1)
         case a: Any    => a.toString
       }
-      def pickle(l: FieldType[F, V] :: T): BSONValue =
-        BSONDocument(wk.value.toString -> hbp.pickle(l.head:V)) ++ tbp.pickle(l.tail).asInstanceOf[BSONDocument]
+      def pickle(l: FieldType[F, V] :: T): BSONValue = {
+        val d = BSONDocument(wk.value.toString -> hbp.pickle(l.head:V))
+        tbp.pickle(l.tail) match {
+          case a: BSONArray => BSONArray(d) ++ a
+          case x => d ++ x.asInstanceOf[BSONDocument]
+        }
+      }
       def unpickle(v: BSONValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
         d <- typecheck[BSONDocument](v, path)(identity)
         v <- d.get(name).cata(_.right, s"""field `${(path :+ name).mkString(".")}' not found""".left)
