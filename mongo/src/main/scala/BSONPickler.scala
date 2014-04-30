@@ -109,7 +109,9 @@ object BSONPickler {
         val d = BSONDocument(wk.value.toString -> hbp.pickle(l.head:V))
         tbp.pickle(l.tail) match {
           case a: BSONArray => BSONArray(d) ++ a
-          case x => d ++ x.asInstanceOf[BSONDocument]
+          case x =>
+            val r = d ++ x.asInstanceOf[BSONDocument]
+            BSONDocument(r.elements.filter(_._2 != BSONUndefined))
         }
       }
       def unpickle(v: BSONValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
