@@ -46,8 +46,13 @@ class Find[A, B, C]
     def find(r: Request[AnyContent], p: B) = for {
       (q, a) <- mkQuery(r, collection(cname), p)
       d      <- q.cursor[A].collect[List]()
-      c      <- collection(cname).count(a)
-    } yield d.map(xs => ("data" ->> xs :: ("meta" ->> ("count" ->> c :: HNil)) :: HNil))
+      st     <- collection(cname).count(a)
+      t      <- collection(cname).count()
+    } yield d.map { xs =>
+      "data" ->> xs ::
+      "meta" ->> ("subtotal" ->> st :: "total" ->> t :: HNil) ::
+      HNil
+    }
 
     def buildResult(r: Request[AnyContent]) =
       pc.collect(rp).fold(
