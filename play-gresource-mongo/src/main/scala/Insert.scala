@@ -15,7 +15,7 @@ import play.core._
 import play.modules.gjson._
 import play.modules.gresource._
 
-import reactivemongo.bson.BSONObjectID
+import reactivemongo.bson.{BSONObjectID, BSONDocument}
 import reactivemongo.core.commands.LastError
 
 import scala.concurrent.{Future, ExecutionContext}
@@ -26,7 +26,8 @@ import Scalaz._
 case class Insert[A, ID](cname: String)
   (implicit
     ec   : ExecutionContext
-  , bsp  : BSONPickler[A]
+  , bsp1 : BSONPickler[A]
+  , bsp2 : BSONPickler[ID]
   , jsp1 : JSONPickler[A]
   , jsp2 : JSONPickler[ID]
   , gen  : Generator[ID]
@@ -45,7 +46,11 @@ case class Insert[A, ID](cname: String)
     def getValue(r: Request[JsValue]): String \/ A =
       r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
 
-    def insert(id: ID)(a: A) = collection(cname).insert(a)
+    def insert(id: ID)(a: A) = {
+      val b = BSONDocument(("_id", BSON.toBSON(id))) ++
+      BSONDocument(BSON.toBSONDoc(a).elements.filter(_._1 != "_id"))
+      collection(cname).insert(b)
+    }
 
     def getStatus(id: ID)(f: Future[LastError]) =
       f.map(le => le.ok.fold(Ok(toJSON(id)), InternalServerError(~le.errMsg)))
