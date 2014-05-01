@@ -2,15 +2,17 @@ package play.modules.gresource.mongo
 
 import gkit.mongo._
 
-import play.modules.gjson._
-import play.modules.gresource._
+import play.api.Play.current
 
 import play.api.mvc._
 
 import play.core.Router._
 import play.core._
 
-import scala.concurrent.Future
+import play.modules.gjson._
+import play.modules.gresource._
+
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 import Scalaz._
@@ -23,7 +25,7 @@ class Aggregate[A, B, C <: HList]
   , mkPipeline: Request[AnyContent] => B => Future[String \/ C]
   )
   (implicit
-    dbe: DbEnv
+    ec: ExecutionContext
   , bp1: BSONPickler[A]
   , bp3: BSONPickler[C]
   , jsp: JSONPickler[A]
@@ -32,11 +34,13 @@ class Aggregate[A, B, C <: HList]
 
   import play.modules.gjson.JSON._
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def toStatus(r: String \/ A) =
       r.fold(InternalServerError(_), as => Ok(toJSON(as)))
@@ -64,7 +68,7 @@ object Aggregate {
       , mkPipeline: Request[AnyContent] => B => Future[String \/ C]
       )
       (implicit
-        dbe: DbEnv
+        ec: ExecutionContext
       , rbp: BSONPickler[A]
       , bsp: BSONPickler[C]
       , jsp: JSONPickler[A]

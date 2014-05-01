@@ -4,6 +4,8 @@ import gkit.Generator
 
 import gkit.mongo._
 
+import play.api.Play.current
+
 import play.api.libs.json._
 import play.api.mvc._
 
@@ -16,14 +18,14 @@ import play.modules.gresource._
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.core.commands.LastError
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 import Scalaz._
 
 case class Insert[A, ID](cname: String)
   (implicit
-    dbe  : DbEnv
+    ec   : ExecutionContext
   , bsp  : BSONPickler[A]
   , jsp1 : JSONPickler[A]
   , jsp2 : JSONPickler[ID]
@@ -32,11 +34,13 @@ case class Insert[A, ID](cname: String)
 
   import play.modules.gjson.JSON._
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def getValue(r: Request[JsValue]): String \/ A =
       r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])

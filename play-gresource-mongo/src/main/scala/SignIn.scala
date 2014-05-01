@@ -4,6 +4,8 @@ import gkit.mongo._
 
 import play.api.libs.json._
 
+import play.api.Play.current
+
 import play.api.mvc._
 
 import play.core.Router._
@@ -13,7 +15,7 @@ import play.modules.gjson.JSON._
 import play.modules.gjson._
 import play.modules.gresource._
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 import scalaz.syntax.either._
@@ -26,17 +28,19 @@ case class SignIn[A, B]
   , getResult : Request[JsValue] => B => Future[SimpleResult]
   )
   (implicit
-    dbe  : DbEnv
+    ec  : ExecutionContext
   , bsp1 : BSONPickler[A]
   , bsp2 : BSONPickler[B]
   , jsp1 : JSONPickler[A]
   ) extends Op[JsValue] {
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route = Route("POST", PathPattern(List(StaticPart(prefix))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def getValue(r: Request[JsValue]) =
       r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])

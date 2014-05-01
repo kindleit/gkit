@@ -4,6 +4,8 @@ import gkit.mongo._
 
 import org.joda.time.DateTime
 
+import play.api.Play.current
+
 import play.api.mvc._
 import play.api.mvc.Results._
 
@@ -13,7 +15,7 @@ import play.core.Router._
 import play.modules.gjson._
 import play.modules.gresource._
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 import scalaz.syntax.std.option._
@@ -27,7 +29,7 @@ class Find[A, B, C]
   , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
   )
   (implicit
-    dbe: DbEnv
+    ec: ExecutionContext
   , bsp1: BSONPickler[A]
   , bsp2: BSONPickler[C]
   , jsp: JSONPickler[A]
@@ -37,11 +39,13 @@ class Find[A, B, C]
 
   import play.modules.gjson.JSON._
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def find(r: Request[AnyContent], p: B) = for {
       (q, a) <- mkQuery(r, collection(cname), p)
@@ -76,7 +80,7 @@ object Find {
       , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
       )
       (implicit
-        dbe: DbEnv
+        ec: ExecutionContext
       , bsp1: BSONPickler[A]
       , bsp2: BSONPickler[C]
       , jsp: JSONPickler[A]
@@ -88,10 +92,9 @@ object Find {
 
   case class DefaultParams(skip: Option[Int], limit: Option[Int])
 
-  def mkDefaultQry(implicit dbe: DbEnv) = {
-    implicit val ec = dbe.executionContext
+  def mkDefaultQry(implicit ex: ExecutionContext) =
     (r: Request[AnyContent], c: Collection, dp: DefaultParams) => {
+      implicit val dbe = GMongoPlugin.dbEnv
       Future((c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10), EmptyQ))
     }
-  }
 }

@@ -4,6 +4,7 @@ import gkit._
 
 import gkit.mongo._
 
+import play.api.Play.current
 import play.api.mvc._
 
 import play.core.Router._
@@ -12,12 +13,12 @@ import play.core._
 import play.modules.gjson._
 import play.modules.gresource._
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 object Resource {
   def apply[A, ID](cname: String)
     (implicit
-      dbe   : DbEnv
+      ec    : ExecutionContext
     , bsp   : BSONPickler[A]
     , bspj  : BSONProj[A]
     , jsp   : JSONPickler[A]
@@ -35,7 +36,7 @@ object Resource {
       , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
       )
       (implicit
-        dbe   : DbEnv
+        ec    : ExecutionContext
       , bsp1  : BSONPickler[A]
       , bsp2  : BSONPickler[C]
       , bspj  : BSONProj[A]
@@ -56,7 +57,7 @@ object Resource {
           Delete[ID](cname).filter(f)
 
         new Op[AnyContent] {
-          implicit def executionContext = dbe.executionContext
+          def executionContext = ec
           val op = mkOp(_ => Future(true))
           val route = op.route
           def action(rp: RouteParams) = op.action(rp)

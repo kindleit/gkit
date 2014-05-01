@@ -2,23 +2,25 @@ package play.modules.gresource.mongo
 
 import gkit.mongo._
 
-import play.api.mvc._
-import play.api.mvc.Results._
+import play.api.Play.current
 
-import play.core._
+import play.api.mvc.Results._
+import play.api.mvc._
+
 import play.core.Router._
+import play.core._
 
 import play.modules.gjson._
 import play.modules.gresource._
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 import scalaz.syntax.std.option._
 
 case class FindOne[A, ID](cname: String)
   (implicit
-    dbe: DbEnv
+    ec: ExecutionContext
   , bsp: BSONPickler[A]
   , jsp: JSONPickler[A]
   , idbp: BSONPickler[ID]
@@ -27,12 +29,14 @@ case class FindOne[A, ID](cname: String)
 
   import play.modules.gjson.JSON._
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route =
     Route("GET", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def findOne(id: ID) = collection(cname).find(IdQ(id)).one[A]
 

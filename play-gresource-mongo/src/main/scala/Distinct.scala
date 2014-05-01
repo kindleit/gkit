@@ -2,6 +2,8 @@ package play.modules.gresource.mongo
 
 import gkit.mongo._
 
+import play.api.Play.current
+
 import play.api.mvc.Results._
 import play.api.mvc._
 
@@ -11,13 +13,13 @@ import play.core._
 import play.modules.gjson._
 import play.modules.gresource._
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 
 class Distinct[A, B](cname: String, key: String, query: B)
   (implicit
-    dbe: DbEnv
+    ec: ExecutionContext
   , rbp: BSONPickler[A]
   , qbp: BSONPickler[B]
   , jsp: JSONPickler[A]
@@ -25,11 +27,13 @@ class Distinct[A, B](cname: String, key: String, query: B)
 
   import play.modules.gjson.JSON._
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def buildResult(r: Request[AnyContent]) = {
       val f = collection(cname).distinct[A](key, query)
@@ -49,7 +53,7 @@ object Distinct {
   def apply[A] = new {
     def apply[B](cname: String, key: String, query: B = EmptyQ)
     (implicit
-      dbe: DbEnv
+      ec: ExecutionContext
     , rbp: BSONPickler[A]
     , bsp: BSONPickler[B]
     , jsp: JSONPickler[A]

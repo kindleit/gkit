@@ -2,6 +2,7 @@ package play.modules.gresource.mongo
 
 import gkit.mongo._
 
+import play.api.Play.current
 import play.api.libs.json._
 import play.api.mvc.Results._
 import play.api.mvc._
@@ -15,14 +16,14 @@ import play.modules.gresource._
 import reactivemongo.bson.BSONDocument
 import reactivemongo.core.commands.LastError
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import scalaz._
 import Scalaz._
 
 case class Update[A, ID](cname: String)
   (implicit
-    dbe: DbEnv
+    ec: ExecutionContext
   , bsp: BSONPickler[A]
   , jsp: JSONPickler[A]
   , idp: BSONPickler[ID]
@@ -31,12 +32,14 @@ case class Update[A, ID](cname: String)
 
   import play.modules.gjson.JSON._
 
-  implicit val executionContext = dbe.executionContext
-
   lazy val route =
     Route("PUT", PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
 
+  def executionContext = ec
+
   def action(rp: RouteParams) = {
+
+    implicit val dbe = GMongoPlugin.dbEnv
 
     def getId = rp.fromPath[ID]("id").value
 
