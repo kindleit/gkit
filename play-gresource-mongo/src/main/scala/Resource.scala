@@ -30,15 +30,16 @@ object Resource {
     = withFindQuery[A, ID](cname, Find.mkDefaultQry)
 
   def withFindQuery[A, ID] = new {
-    def apply[B, C]
+    def apply[B, C, D]
       (
         cname: String
-      , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
+      , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C, D)]
       )
       (implicit
         ec    : ExecutionContext
       , bsp1  : BSONPickler[A]
       , bsp2  : BSONPickler[C]
+      , bsp3  : BSONPickler[D]
       , bspj  : BSONProj[A]
       , jsp   : JSONPickler[A]
       , gen   : Generator[ID]

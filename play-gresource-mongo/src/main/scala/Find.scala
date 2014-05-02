@@ -23,15 +23,16 @@ import scalaz.syntax.std.option._
 import shapeless._
 import shapeless.syntax.singleton._
 
-class Find[A, B, C]
+class Find[A, B, C, D]
   (
     cname: String
-  , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
+  , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C, D)]
   )
   (implicit
     ec: ExecutionContext
   , bsp1: BSONPickler[A]
   , bsp2: BSONPickler[C]
+  , bsp3: BSONPickler[D]
   , jsp: JSONPickler[A]
   , bspj: BSONProj[A]
   , pc: ParamsCollector[B]
@@ -48,10 +49,10 @@ class Find[A, B, C]
     val dbe = GMongoPlugin.dbEnv
 
     def find(r: Request[AnyContent], p: B) = for {
-      (q, a) <- mkQuery(r, dbe.collection(cname), p)
-      d      <- q.cursor[A].collect[List]()
-      st     <- dbe.collection(cname).count(a)
-      t      <- dbe.collection(cname).count()
+      (q, a, b) <- mkQuery(r, dbe.collection(cname), p)
+      d         <- q.cursor[A].collect[List]()
+      st        <- dbe.collection(cname).count(a)
+      t         <- dbe.collection(cname).count(b)
     } yield d.map { xs =>
       "data" ->> xs ::
       "meta" ->> ("subtotal" ->> st :: "total" ->> t :: HNil) ::
@@ -67,33 +68,34 @@ class Find[A, B, C]
   }
 
   def filter(f: Request[AnyContent] => Future[Boolean]) =
-    new Find[A, B, C](cname, mkQuery) {
+    new Find[A, B, C, D](cname, mkQuery) {
       override def accept(r: Request[AnyContent]) = f(r)
     }
 }
 
 object Find {
   def apply[A] = new {
-    def apply[B, C]
+    def apply[B, C, D]
       (
         cname: String
-      , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C)]
+      , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C, D)]
       )
       (implicit
         ec: ExecutionContext
       , bsp1: BSONPickler[A]
       , bsp2: BSONPickler[C]
+      , bsp3: BSONPickler[D]
       , jsp: JSONPickler[A]
       , bspj: BSONProj[A]
       , pc: ParamsCollector[B]
       )
-      = new Find[A, B, C](cname, mkQuery)
+      = new Find[A, B, C, D](cname, mkQuery)
   }
 
   case class DefaultParams(skip: Option[Int], limit: Option[Int])
 
   def mkDefaultQry(implicit ex: ExecutionContext) =
     (r: Request[AnyContent], c: Collection, dp: DefaultParams) => {
-      Future((c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10), EmptyQ))
+      Future((c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10), EmptyQ, EmptyQ))
     }
 }
