@@ -39,7 +39,7 @@ case class Update[A, ID](cname: String)
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
     def getId = rp.fromPath[ID]("id").value
 
@@ -48,7 +48,7 @@ case class Update[A, ID](cname: String)
 
     def update(id: ID)(a: A) = {
       val b = BSONDocument(BSON.toBSONDoc(a).elements.filter(_._1 != "_id"))
-      collection(cname).update(IdQ(id), Set(b))
+      dbe.collection(cname).update(IdQ(id), Set(b))
     }
 
     def getStatus(fle: Future[LastError]) =

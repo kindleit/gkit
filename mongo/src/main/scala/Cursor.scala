@@ -1,10 +1,12 @@
 package gkit.mongo
 
+import reactivemongo.api._
+
 import reactivemongo.core.errors.DatabaseException
 
 import play.api.libs.iteratee.Enumerator
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 import scala.collection.generic.CanBuildFrom
 
 import scalaz._
@@ -14,9 +16,12 @@ import scalaz.syntax.monoid._
 import scalaz.syntax.std.option._
 import scalaz.syntax.validation._
 
-case class Cursor[T](dbe: DbEnv, cursor: reactivemongo.api.Cursor[T], upTo: Int = Int.MaxValue) {
-
-  implicit val ec = dbe.executionContext
+case class Cursor[T]
+  (
+    db: DefaultDB
+  , cursor: reactivemongo.api.Cursor[T]
+  , upTo: Int = Int.MaxValue
+  )(implicit ec: ExecutionContext) {
 
   def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false): Enumerator[T] =
     cursor.enumerate(maxDocs, stopOnError)

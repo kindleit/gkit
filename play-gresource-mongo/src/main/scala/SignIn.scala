@@ -40,13 +40,13 @@ case class SignIn[A, B]
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
     def getValue(r: Request[JsValue]) =
       r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
 
     def signIn(r: Request[JsValue])(a: A) =
-      getQuery(collection(cname))(a).one[B].flatMap(_.cata(getResult(r), Future(Unauthorized)))
+      getQuery(dbe.collection(cname))(a).one[B].flatMap(_.cata(getResult(r), Future(Unauthorized)))
 
     buildAction(parse.json)(r => getValue(r).fold(e => Future(BadRequest(e)), signIn(r)))
   }

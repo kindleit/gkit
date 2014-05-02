@@ -41,7 +41,7 @@ case class Insert[A, ID](cname: String)
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
     def getValue(r: Request[JsValue]): String \/ A =
       r.body.asOpt[JsObject].cata(fromJSON[A], "invalid json value".left[A])
@@ -49,7 +49,7 @@ case class Insert[A, ID](cname: String)
     def insert(id: ID)(a: A) = {
       val b = BSONDocument(("_id", BSON.toBSON(id))) ++
       BSONDocument(BSON.toBSONDoc(a).elements.filter(_._1 != "_id"))
-      collection(cname).insert(b)
+      dbe.collection(cname).insert(b)
     }
 
     def getStatus(id: ID)(f: Future[LastError]) =

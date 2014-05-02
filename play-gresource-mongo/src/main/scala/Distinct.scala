@@ -33,10 +33,10 @@ class Distinct[A, B](cname: String, key: String, query: B)
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
     def buildResult(r: Request[AnyContent]) = {
-      val f = collection(cname).distinct[A](key, query)
+      val f = dbe.collection(cname).distinct[A](key, query)
       f.map(_.fold(e => InternalServerError(e), as => Ok(toJSON(as))))
     }
 

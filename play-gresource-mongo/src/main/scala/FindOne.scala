@@ -36,9 +36,9 @@ case class FindOne[A, ID](cname: String)
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
-    def findOne(id: ID) = collection(cname).find(IdQ(id)).one[A]
+    def findOne(id: ID) = dbe.collection(cname).find(IdQ(id)).one[A]
 
     def mapToStatus(f: Future[Option[A]]) = f.map(_.cata(a => Ok(toJSON(a)), NotFound))
 

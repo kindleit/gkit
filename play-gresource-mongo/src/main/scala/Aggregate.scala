@@ -40,13 +40,13 @@ class Aggregate[A, B, C <: HList]
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
     def toStatus(r: String \/ A) =
       r.fold(InternalServerError(_), as => Ok(toJSON(as)))
 
     def aggregate(r: Request[AnyContent])(ps: B) =
-      mkPipeline(r)(ps).flatMap(_.fold(e => Future(e.left), x => collection(cname).aggregate[A](x)))
+      mkPipeline(r)(ps).flatMap(_.fold(e => Future(e.left), x => dbe.collection(cname).aggregate[A](x)))
 
     def buildResult(r: Request[AnyContent]) =
       pc.collect(rp).fold(e => Future(BadRequest(e)), ps => aggregate(r)(ps).map(toStatus))

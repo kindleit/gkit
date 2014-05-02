@@ -30,10 +30,10 @@ case class Delete[ID](cname: String)
 
   def action(rp: RouteParams) = {
 
-    implicit val dbe = GMongoPlugin.dbEnv
+    val dbe = GMongoPlugin.dbEnv
 
     def delete(id: ID) =
-      collection(cname).remove(IdQ(id)).map(le => (le.updated > 0).fold(Ok, NotFound))
+      dbe.collection(cname).remove(IdQ(id)).map(le => (le.updated > 0).fold(Ok, NotFound))
 
     def buildResult(r: Request[AnyContent]) =
       rp.fromPath[ID]("id").value.fold(e => Future(BadRequest(e)), delete)

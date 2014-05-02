@@ -5,6 +5,8 @@ import reactivemongo.api.collections.GenericQueryBuilder
 
 import reactivemongo.bson.{ BSONValue, BSONObjectID, BSONDocument, BSONDocumentReader, BSONDocumentWriter }
 
+import scala.concurrent.ExecutionContext
+
 import scalaz._
 import scalaz.std.string._
 import scalaz.syntax.id._
@@ -13,15 +15,13 @@ import scalaz.syntax.std.option._
 
 case class QueryBuilder
   (
-    dbe: DbEnv
+    db: DefaultDB
   , queryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter]
   , offset: Int = 0
   , upTo: Int = Int.MaxValue
-  ) {
+  )(implicit ec: ExecutionContext) {
 
   import BSON._
-
-  implicit val ec = dbe.executionContext
 
   implicit def reader[A](implicit bp: BSONPickler[A]) = new BSONDocumentReader[A] {
     def read(doc: BSONDocument) =
@@ -40,7 +40,7 @@ case class QueryBuilder
   def limit(n: Int): QueryBuilder = take(n)
 
   def cursor[A](implicit bp: BSONPickler[A]) =
-    Cursor(dbe, queryBuilder.options(QueryOpts(skipN = offset, batchSizeN = upTo)).cursor[A], upTo)
+    Cursor(db, queryBuilder.options(QueryOpts(skipN = offset, batchSizeN = upTo)).cursor[A], upTo)
 
   def one[A](implicit bp: BSONPickler[A]) = queryBuilder.one[A]
 }
