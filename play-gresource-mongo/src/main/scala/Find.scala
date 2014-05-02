@@ -94,7 +94,6 @@ object Find {
 
   def mkDefaultQry(implicit ex: ExecutionContext) =
     (r: Request[AnyContent], c: Collection, dp: DefaultParams) => {
-      implicit val dbe = GMongoPlugin.dbEnv
       Future((c.find(EmptyQ).drop(dp.skip | 0).take(dp.limit | 10), EmptyQ))
     }
 }
