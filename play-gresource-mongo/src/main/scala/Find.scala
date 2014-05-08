@@ -85,7 +85,6 @@ object Find {
       , bsp2: BSONPickler[C]
       , bsp3: BSONPickler[D]
       , jsp: JSONPickler[A]
-      , bspj: BSONProj[A]
       , pc: ParamsCollector[B]
       )
       = new Find[A, B, C, D](cname, mkQuery)
