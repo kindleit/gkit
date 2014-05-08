@@ -34,7 +34,6 @@ class Find[A, B, C, D]
   , bsp2: BSONPickler[C]
   , bsp3: BSONPickler[D]
   , jsp: JSONPickler[A]
-  , bspj: BSONProj[A]
   , pc: ParamsCollector[B]
   ) extends Op[AnyContent] {
 
