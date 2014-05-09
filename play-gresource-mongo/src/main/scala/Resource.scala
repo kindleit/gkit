@@ -15,43 +15,44 @@ import play.modules.gresource._
 
 import scala.concurrent.{Future, ExecutionContext}
 
+import scalaz.\/
+
 object Resource {
   def apply[A, ID](cname: String)
     (implicit
-      ec    : ExecutionContext
-    , bsp   : BSONPickler[A]
-    , bspj  : BSONProj[A]
-    , jsp   : JSONPickler[A]
-    , gen   : Generator[ID]
-    , idjsp : JSONPickler[ID]
-    , idbsp : BSONPickler[ID]
-    , idpb  : PathBindable[ID]
+      ec  : ExecutionContext
+    , bp1 : BSONPickler[A]
+    , bp2 : BSONPickler[ID]
+    , jp1 : JSONPickler[A]
+    , jp2 : JSONPickler[ID]
+    , gen : Generator[ID]
+    , pb  : PathBindable[ID]
     )
-    = withFindQuery[A, ID](cname, Find.mkDefaultQry)
+    = withFindQuery[A, ID](cname, Find.mkDefaultQry[A])
 
-  def withFindQuery[A, ID] = new {
-    def apply[B, C, D]
+  def withFindQuery[A, ID] = new WithFindQuery[A, ID]
+
+  class WithFindQuery[A, ID] {
+    def apply[B, C]
       (
         cname: String
-      , mkQuery: (Request[AnyContent], Collection, B) => Future[(QueryBuilder, C, D)]
+      , mkQuery: (Request[AnyContent], B, Collection) => Future[String \/ C]
       )
       (implicit
-        ec    : ExecutionContext
-      , bsp1  : BSONPickler[A]
-      , bsp2  : BSONPickler[C]
-      , bsp3  : BSONPickler[D]
-      , bspj  : BSONProj[A]
-      , jsp   : JSONPickler[A]
-      , gen   : Generator[ID]
-      , idjsp : JSONPickler[ID]
-      , idbsp : BSONPickler[ID]
-      , idpb  : PathBindable[ID]
-      , pc    : ParamsCollector[B]
+        ec  : ExecutionContext
+      , bp1 : BSONPickler[A]
+      , bp2 : BSONPickler[ID]
+      , jp1 : JSONPickler[A]
+      , jp2 : JSONPickler[C]
+      , jp3 : JSONPickler[ID]
+      , gen : Generator[ID]
+      , pb  : PathBindable[ID]
+      , pc  : ParamsCollector[B]
       )
       =
       {
         def mkOp(f: RequestHeader => Future[Boolean]) =
-          Find[A](cname, mkQuery).filter(f) |:
+          Find(cname, mkQuery).filter(f) |:
           FindOne[A, ID](cname).filter(f)   |:
           Insert[A, ID](cname).filter(f)    |:
           Update[A, ID](cname).filter(f)    |:

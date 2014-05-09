@@ -4,7 +4,7 @@ import Keys._
 object build extends Build {
 
   lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
-    version            := "0.1.1",
+    version            := "0.1.2-SNAPSHOT",
     organization       := "com.kindleit",
     scalaVersion       := "2.10.4",
     scalacOptions     ++= Seq("-feature", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
