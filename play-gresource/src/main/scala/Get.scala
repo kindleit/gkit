@@ -7,7 +7,10 @@ import play.core._
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class Get[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[SimpleResult])
+import scalaz.\/
+import scalaz.syntax.either._
+
+class Get[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[String \/ SimpleResult])
   (implicit ec: ExecutionContext, pc: ParamsCollector[B]) extends Op[A] {
 
   lazy val route = Route("GET", PathPattern(List(StaticPart(prefix))))
@@ -17,8 +20,9 @@ class Get[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[SimpleResult])
   def action(rp: RouteParams) = {
 
     def buildResult(r: Request[A]) =
-      pc.collect(rp).fold(e => Future(BadRequest(e)), run(r))
-
+      pc.collect(rp).fold(
+        e => Future(BadRequest(e)),
+        run(r)(_).map(_.fold(InternalServerError(_), identity)))
     buildAction(bp)(buildResult)
   }
 
@@ -29,17 +33,17 @@ class Get[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[SimpleResult])
 }
 
 object Get {
-  def apply(run: Request[AnyContent] => Future[SimpleResult])
+  def apply(run: Request[AnyContent] => Future[String \/ SimpleResult])
     (implicit ec: ExecutionContext) = {
     implicitly[ParamsCollector[Unit]]
     new Get[AnyContent, Unit](BodyParsers.parse.anyContent)(r => _ => run(r))
   }
 
-  def get[A](run: Request[AnyContent] => A => Future[SimpleResult])
+  def get[A](run: Request[AnyContent] => A => Future[String \/ SimpleResult])
     (implicit ec: ExecutionContext, pc: ParamsCollector[A]) =
     new Get[AnyContent, A](BodyParsers.parse.anyContent)(run)
 
-  def withParser[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[SimpleResult])
+  def withParser[A, B](bp: BodyParser[A])(run: Request[A] => B => Future[String \/ SimpleResult])
     (implicit ec: ExecutionContext , pc: ParamsCollector[B]) =
     new Get[A, B](bp)(run)
 }
