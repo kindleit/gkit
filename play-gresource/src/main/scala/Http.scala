@@ -1,110 +1,73 @@
-package play.modules.gresource
-
-import gkit._
+package play.modules.gresource.mongo
 
 import play.api.libs.json._
 
-import play.api.http._
-
 import play.api.mvc._
+import play.api.mvc.Results._
 
 import play.core.Router._
 import play.core._
 
 import play.modules.gjson._
+import play.modules.gresource._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Future, ExecutionContext}
 
-import scala.runtime.AbstractPartialFunction
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import scalaz._
 import scalaz.Scalaz._
 
-case class RequestW[A, B, C](request: Request[A], params: B, body: C)
+sealed trait Error
+case class Fatal(msg: String) extends Error
+case class Nonfatal(msg: String) extends Error
 
 object Http {
 
-  def mkRoute(method: String)(prefix: String) =
-    Route(method, PathPattern(List(StaticPart(prefix))))
+  type ES[F[_], A] = EitherT[F, Error, A]
+  type EIS[A] = EitherT[Id, Error, A]
+  type KEISR[A] = Kleisli[EIS, Request[AnyContent], A]
+  type KR[F[_], A] = Kleisli[F, Request[AnyContent], A]
 
-  def mkRouteWithId(method: String)(prefix: String) =
-    Route(method, PathPattern(List(StaticPart(s"$prefix/"), DynamicPart("id", ".+", false))))
+  def jsValueFromReq[A](implicit JP: JSONPickler[A]): KEISR[A] =
+    Kleisli.local[EIS, A, Request[AnyContent]](identity)(for {
+      r <- Kleisli.ask[EIS, Request[JsValue]]
+      a <- EitherT(JP.unpickle(r.body).leftMap(Nonfatal(_):Error).point[Id]).liftM[KR]
+    } yield a)
 
-  def json[A, B]
-    (mkRoute: String => Route.ParamsExtractor)
-    (run: RequestW[JsValue, A, B] => Future[String \/ SimpleResult])
-    (implicit pc: ParamsCollector[A], jp: JSONPickler[B]) =
-    new Op[JsValue, A, B](BodyParsers.parse.json)(mkRoute)(run)
+  def paramsFromReq[A](rp: RouteParams)(implicit PC: ParamsCollector[A]): KEISR[A] = for {
+    r <- Kleisli.ask[EIS, Request[AnyContent]]
+    a <- EitherT(PC.collect(rp).leftMap(Nonfatal(_):Error).point[Id]).liftM[KR]
+  } yield a
 
-  class Op[A, B, C]
+  def jsValueResult[M[_], A](implicit M: Monad[M], JP: JSONPickler[A]): Kleisli[M, A, SimpleResult] =
+    Kleisli((a: A) => M.point(Ok(JP.pickle(a))))
+
+  def doWith[A, B, C](rp: RouteParams)(k: Kleisli[EIS, (A, B), C])
+    (implicit PC: ParamsCollector[A], JP: JSONPickler[B]): Kleisli[EIS, Request[AnyContent], C] =
+    (paramsFromReq[A](rp) &&& jsValueFromReq[B]) >>> k
+
+  def mkGetRoute(prefix: String) = Route("GET", PathPattern(List(StaticPart(prefix))))
+
+  def get[A](k: Kleisli[EIS, A, Future[SimpleResult]])
+    (implicit PC: ParamsCollector[A]) =
+    OpWrapper(BodyParsers.parse.anyContent)(mkGetRoute) { (rp, req) =>
+      (paramsFromReq(rp) >>> k).run(req).run.fold({
+        case Fatal(msg) => Future(InternalServerError(msg))
+        case Nonfatal(msg) => Future(BadRequest(msg))
+      }, identity)
+    }
+
+  case class OpWrapper[A]
     (bp: BodyParser[A])
     (mkRoute: String => Route.ParamsExtractor)
-    (run: RequestW[A, B, C] => Future[String \/ SimpleResult])
-    (implicit pc: ParamsCollector[B], p: Pickler[C, A])
-      extends Routes with Results with BodyParsers with Status { self =>
-
+    (run: (RouteParams, Request[A]) => Future[SimpleResult])
+      extends Routes {
     private var path: String = ""
-
-    implicit def ec = play.api.libs.concurrent.Execution.Implicits.defaultContext
-
-    def filter(f: Request[A] => Future[Boolean]): Op[A, B, C] =
-      new Op[A, B, C](bp)(mkRoute)(run) {
-        override def accept(r: Request[A]) = f(r)
-        override def check(body: C) = self.check(body)
-      }
-
-    def validate(f: C => String \/ C) =
-      new Op[A, B, C](bp)(mkRoute)(run) {
-        override def accept(r: Request[A]) = self.accept(r)
-        override def check(v: C) = f(v)
-      }
-
-    def action(rp: RouteParams): Handler = {
-
-      def mkReqW(r: Request[A]) = for {
-        ps <- pc.collect(rp)
-        b1 <- p.unpickle(r.body)
-        b2 <- check(b1)
-      } yield RequestW(r, ps, b2)
-
-      def mkReqWAndRun(r: Request[A]) =
-        mkReqW(r).fold(
-          e => Future(BadRequest(e)),
-          rw => run(rw).map(_.fold(InternalServerError(_), identity)))
-
-      def buildResult(r: Request[A]) =
-        accept(r).flatMap(_.fold(mkReqWAndRun(r), Future(Forbidden)))
-
-      Action.async(bp)(buildResult)
-    }
-
-    def accept(r: Request[A]): Future[Boolean] = Future(true)
-
-    def check(v: C): String \/ C = v.right
-
-    def routes = params(mkRoute(prefix)) >>> (action _).arrow[PartialFunction]
-
-    def params(pe: Route.ParamsExtractor): PartialFunction[RequestHeader, RouteParams] = {
-      case pe(rp) => rp
-    }
-
-    def orElse[D, E, F](op: Op[D, E, F]) = new Op[A, B, C](bp)(mkRoute)(run) {
-      override def routes = new AbstractPartialFunction[RequestHeader, Handler] {
-        op.setPrefix(prefix)
-        self.setPrefix(prefix)
-        override def applyOrElse[A <: RequestHeader, B >: Handler](rh: A, default: A => B) =
-          op.routes.applyOrElse(rh, self.routes)
-        override def isDefinedAt(rh: RequestHeader) =
-          op.routes.isDefinedAt(rh) || self.routes.isDefinedAt(rh)
-      }
-    }
-
-    def |:[D, E, F](op: Op[D, E, F]) = orElse(op)
-
+    lazy val route = mkRoute(prefix)
+    def routes = { case route(rp) => Action.async(bp)(run(rp, _)) }
     def prefix = path
-
     def setPrefix(prefix: String) = { path = prefix }
-
     def documentation = Seq()
   }
 }
