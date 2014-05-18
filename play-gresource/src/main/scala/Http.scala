@@ -16,56 +16,87 @@ import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scalaz._
-import scalaz.Scalaz._
-
-sealed trait Error
-case class Fatal(msg: String) extends Error
-case class Nonfatal(msg: String) extends Error
+import Scalaz._
 
 object Http {
 
-  type ES[F[_], A] = EitherT[F, Error, A]
-  type EIS[A] = EitherT[Id, Error, A]
-  type KEISR[A] = Kleisli[EIS, Request[AnyContent], A]
-  type KR[F[_], A] = Kleisli[F, Request[AnyContent], A]
+  sealed trait Error
+  case class E400(msg: String) extends Error
+  case class E403(msg: String) extends Error
+  case class E500(msg: String) extends Error
 
-  def jsValueFromReq[A](implicit JP: JSONPickler[A]): KEISR[A] =
-    Kleisli.local[EIS, A, Request[AnyContent]](identity)(for {
-      r <- Kleisli.ask[EIS, Request[JsValue]]
-      a <- EitherT(JP.unpickle(r.body).leftMap(Nonfatal(_):Error).point[Id]).liftM[KR]
-    } yield a)
+  case class Req[A](underlying: Request[A], routeParams: RouteParams)
 
-  def paramsFromReq[A](rp: RouteParams)(implicit PC: ParamsCollector[A]): KEISR[A] = for {
-    r <- Kleisli.ask[EIS, Request[AnyContent]]
-    a <- EitherT(PC.collect(rp).leftMap(Nonfatal(_):Error).point[Id]).liftM[KR]
-  } yield a
+  type JReq = Req[JsValue]
+  type AReq = Req[AnyContent]
+  type EFE[A] = EitherT[Future, Error, A]
 
-  def jsValueResult[M[_], A](implicit M: Monad[M], JP: JSONPickler[A]): Kleisli[M, A, SimpleResult] =
-    Kleisli((a: A) => M.point(Ok(JP.pickle(a))))
+  def liftK[A, B](f: A => Future[Error \/ B]): Kleisli[EFE, A, B] =
+    for {
+      r <- Kleisli.ask[EFE, A]
+      a <- EitherT(f(r)).liftM[({type λ[α[_],β]=Kleisli[α, A, β]})#λ]
+    } yield a
 
-  def doWith[A, B, C](rp: RouteParams)(k: Kleisli[EIS, (A, B), C])
-    (implicit PC: ParamsCollector[A], JP: JSONPickler[B]): Kleisli[EIS, Request[AnyContent], C] =
-    (paramsFromReq[A](rp) &&& jsValueFromReq[B]) >>> k
+  def error[A]: Kleisli[EFE, Error, A] =
+    liftK((e: Error) => Future(e.left))
 
-  def mkGetRoute(prefix: String) = Route("GET", PathPattern(List(StaticPart(prefix))))
+  def filter[A](f: Req[A] => Future[Error \/ Boolean]): Kleisli[EFE, Req[A], Error \/ Req[A]] =
+    liftK(r => f(r).map(_.map(_.fold(r.right, E403("").left))))
 
-  def get[A](k: Kleisli[EIS, A, Future[SimpleResult]])
-    (implicit PC: ParamsCollector[A]) =
-    OpWrapper(BodyParsers.parse.anyContent)(mkGetRoute) { (rp, req) =>
-      (paramsFromReq(rp) >>> k).run(req).run.fold({
-        case Fatal(msg) => Future(InternalServerError(msg))
-        case Nonfatal(msg) => Future(BadRequest(msg))
-      }, identity)
-    }
+  def paramsFromReq[A, B](implicit PC: ParamsCollector[B]): Kleisli[EFE, Req[A], B] =
+    liftK((r: Req[A]) => PC.collect(r.routeParams).leftMap(E400(_):Error).point[Future])
 
-  case class OpWrapper[A]
+  def jsonFromReq[A](implicit JP: JSONPickler[A]): Kleisli[EFE, JReq, A] =
+    liftK(r => JP.unpickle(r.underlying.body).leftMap(E400(_):Error).point[Future])
+
+  def jsonToResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, A, SimpleResult] =
+    Kleisli((a: A) => Ok(JP.pickle(a)).point[EFE])
+
+  def errorToResult(e: Error): SimpleResult = e match {
+    case E400(msg) => BadRequest(msg)
+    case E403(msg) => Forbidden(msg)
+    case E500(msg) => InternalServerError(msg)
+  }
+
+  def pathSuffix[A](name: String)(implicit PB: PathBindable[A]) =
+    liftK((r: AReq) => r.routeParams.fromPath[A](name).value.fold(e => (E400(e):Error).left, _.right).point[Future])
+
+  def mkRoute(method: String)(prefix: String) =
+    Route(method, PathPattern(List(StaticPart(prefix))))
+
+  def get(k: Kleisli[EFE, AReq, SimpleResult]) =
+    Op(BodyParsers.parse.anyContent)(mkRoute("GET"))(k)
+
+  def delete(k: Kleisli[EFE, AReq, SimpleResult]) =
+    Op(BodyParsers.parse.anyContent)(mkRoute("DELETE"))(k)
+
+  def jsonPost(k: Kleisli[EFE, JReq, SimpleResult]) =
+    jsonOp(mkRoute("POST"))(k)
+
+  def jsonPut(k: Kleisli[EFE, JReq, SimpleResult]) =
+    jsonOp(mkRoute("PUT"))(k)
+
+  def jsonOp(mkRoute: String => Route.ParamsExtractor)(k: Kleisli[EFE, JReq, SimpleResult]) =
+    Op(BodyParsers.parse.json)(mkRoute)(k)
+
+  def find[A, B](f: A => Future[Error \/ B])
+    (implicit PC: ParamsCollector[A], JP: JSONPickler[B]): Kleisli[EFE, AReq, SimpleResult] =
+    paramsFromReq[AnyContent, A] >>> liftK(f) >>> jsonToResult[B]
+
+  def insert[A, B](f: A => Future[Error \/ B])
+    (implicit JP1: JSONPickler[A], JP2: JSONPickler[B]): Kleisli[EFE, JReq, SimpleResult] =
+    jsonFromReq[A] >>> liftK(f) >>> jsonToResult[B]
+
+  case class Op[A]
     (bp: BodyParser[A])
     (mkRoute: String => Route.ParamsExtractor)
-    (run: (RouteParams, Request[A]) => Future[SimpleResult])
+    (k: Kleisli[EFE, Req[A], SimpleResult])
       extends Routes {
     private var path: String = ""
     lazy val route = mkRoute(prefix)
-    def routes = { case route(rp) => Action.async(bp)(run(rp, _)) }
+    def routes = {
+      case route(rp) => Action.async(bp)(r => k.run(Req(r, rp)).leftMap(errorToResult).run.map(_.merge))
+    }
     def prefix = path
     def setPrefix(prefix: String) = { path = prefix }
     def documentation = Seq()
