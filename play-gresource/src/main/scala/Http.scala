@@ -1,4 +1,4 @@
-package play.modules.gresource.mongo
+package play.modules.gresource
 
 import play.api.libs.json._
 
@@ -12,8 +12,9 @@ import play.modules.gjson._
 import play.modules.gresource._
 
 import scala.concurrent.{Future, ExecutionContext}
-
 import scala.concurrent.ExecutionContext.Implicits.global
+
+import scala.runtime.AbstractPartialFunction
 
 import scalaz._
 import Scalaz._
@@ -37,20 +38,25 @@ object Http {
       a <- EitherT(f(r)).liftM[({type λ[α[_],β]=Kleisli[α, A, β]})#λ]
     } yield a
 
+  def idK[A]: Kleisli[EFE, A, A] =
+    liftK((a: A) => Future(a.right))
+
   def error[A]: Kleisli[EFE, Error, A] =
     liftK((e: Error) => Future(e.left))
 
-  def filter[A](f: Req[A] => Future[Error \/ Boolean]): Kleisli[EFE, Req[A], Error \/ Req[A]] =
+  def accept[A](f: Req[A] => Future[Error \/ Boolean]): Kleisli[EFE, Req[A], Error \/ Req[A]] =
     liftK(r => f(r).map(_.map(_.fold(r.right, E403("").left))))
 
-  def paramsFromReq[A, B](implicit PC: ParamsCollector[B]): Kleisli[EFE, Req[A], B] =
-    liftK((r: Req[A]) => PC.collect(r.routeParams).leftMap(E400(_):Error).point[Future])
+  def paramsFromReq[A]: ParamsFromReq[A] = new ParamsFromReq[A]
 
   def jsonFromReq[A](implicit JP: JSONPickler[A]): Kleisli[EFE, JReq, A] =
     liftK(r => JP.unpickle(r.underlying.body).leftMap(E400(_):Error).point[Future])
 
-  def jsonToResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, A, SimpleResult] =
+  def toJsonResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, A, SimpleResult] =
     Kleisli((a: A) => Ok(JP.pickle(a)).point[EFE])
+
+  def optionToJsonResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, Option[A], SimpleResult] =
+    Kleisli((oa: Option[A]) => oa.cata(a => Ok(JP.pickle(a)), NotFound).point[EFE])
 
   def errorToResult(e: Error): SimpleResult = e match {
     case E400(msg) => BadRequest(msg)
@@ -58,47 +64,73 @@ object Http {
     case E500(msg) => InternalServerError(msg)
   }
 
-  def pathSuffix[A](name: String)(implicit PB: PathBindable[A]) =
-    liftK((r: AReq) => r.routeParams.fromPath[A](name).value.fold(e => (E400(e):Error).left, _.right).point[Future])
+  def pathParam[A]: PathParam[A] = new PathParam[A]
 
-  def mkRoute(method: String)(prefix: String) =
-    Route(method, PathPattern(List(StaticPart(prefix))))
+  def mkPath(path: Path, prefix: String): List[PathPart] = path match {
+    case Prefix         => StaticPart(prefix) :: Nil
+    case /(path, name)  => mkPath(path, prefix) ::: List(StaticPart("/"), StaticPart(name))
+    case /?(path, name) => mkPath(path, prefix) ::: List(StaticPart("/"), DynamicPart(name, ".+", false))
+  }
 
-  def get(k: Kleisli[EFE, AReq, SimpleResult]) =
-    Op(BodyParsers.parse.anyContent)(mkRoute("GET"))(k)
+  def mkRoute(method: String)(path: Path)(prefix: String) =
+    Route(method, PathPattern(mkPath(path, prefix)))
 
-  def delete(k: Kleisli[EFE, AReq, SimpleResult]) =
-    Op(BodyParsers.parse.anyContent)(mkRoute("DELETE"))(k)
+  def get(path: Path)(k: Kleisli[EFE, AReq, SimpleResult]) =
+    Op(BodyParsers.parse.anyContent)(mkRoute("GET")(path))(k)
 
-  def jsonPost(k: Kleisli[EFE, JReq, SimpleResult]) =
-    jsonOp(mkRoute("POST"))(k)
+  def delete(path: Path)(k: Kleisli[EFE, AReq, SimpleResult]) =
+    Op(BodyParsers.parse.anyContent)(mkRoute("DELETE")(path))(k)
 
-  def jsonPut(k: Kleisli[EFE, JReq, SimpleResult]) =
-    jsonOp(mkRoute("PUT"))(k)
+  def jsonPost(path: Path)(k: Kleisli[EFE, JReq, SimpleResult]) =
+    Op(BodyParsers.parse.json)(mkRoute("POST")(path))(k)
 
-  def jsonOp(mkRoute: String => Route.ParamsExtractor)(k: Kleisli[EFE, JReq, SimpleResult]) =
-    Op(BodyParsers.parse.json)(mkRoute)(k)
-
-  def find[A, B](f: A => Future[Error \/ B])
-    (implicit PC: ParamsCollector[A], JP: JSONPickler[B]): Kleisli[EFE, AReq, SimpleResult] =
-    paramsFromReq[AnyContent, A] >>> liftK(f) >>> jsonToResult[B]
-
-  def insert[A, B](f: A => Future[Error \/ B])
-    (implicit JP1: JSONPickler[A], JP2: JSONPickler[B]): Kleisli[EFE, JReq, SimpleResult] =
-    jsonFromReq[A] >>> liftK(f) >>> jsonToResult[B]
+  def jsonPut(path: Path)(k: Kleisli[EFE, JReq, SimpleResult]) =
+    Op(BodyParsers.parse.json)(mkRoute("PUT")(path))(k)
 
   case class Op[A]
     (bp: BodyParser[A])
     (mkRoute: String => Route.ParamsExtractor)
     (k: Kleisli[EFE, Req[A], SimpleResult])
-      extends Routes {
+      extends Routes { self =>
     private var path: String = ""
     lazy val route = mkRoute(prefix)
+
     def routes = {
       case route(rp) => Action.async(bp)(r => k.run(Req(r, rp)).leftMap(errorToResult).run.map(_.merge))
     }
     def prefix = path
     def setPrefix(prefix: String) = { path = prefix }
     def documentation = Seq()
+
+    def orElse[B](op: Op[B]) = new Op[A](bp)(mkRoute)(k) {
+      override def routes = new AbstractPartialFunction[RequestHeader, Handler] {
+        op.setPrefix(prefix)
+        self.setPrefix(prefix)
+        override def applyOrElse[A <: RequestHeader, B >: Handler](rh: A, default: A => B) =
+          op.routes.applyOrElse(rh, self.routes)
+        override def isDefinedAt(rh: RequestHeader) =
+          op.routes.isDefinedAt(rh) || self.routes.isDefinedAt(rh)
+      }
+    }
+
+    def |:[B](op: Op[B]) = orElse(op)
+  }
+
+  sealed trait Path {
+    def /(name: String) = new /(this, name)
+    def /?(name: String) = new /?(this, name)
+  }
+  case object Prefix extends Path
+  case class /(parent: Path, name: String) extends Path
+  case class /?(parent: Path, name: String) extends Path
+
+  class PathParam[A] {
+    def apply[B](name: String)(implicit PB: PathBindable[A]) =
+      liftK((r: Req[B]) => r.routeParams.fromPath[A](name).value.fold(e => (E400(e):Error).left, _.right).point[Future])
+  }
+
+  class ParamsFromReq[A] {
+    def apply[B](implicit PC: ParamsCollector[A]): Kleisli[EFE, Req[B], A] =
+      liftK((r: Req[B]) => PC.collect(r.routeParams).leftMap(E400(_):Error).point[Future])
   }
 }
