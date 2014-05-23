@@ -23,6 +23,7 @@ object Http {
 
   sealed trait Error
   case class E400(msg: String) extends Error
+  case class E404(msg: String) extends Error
   case class E403(msg: String) extends Error
   case class E500(msg: String) extends Error
 
@@ -111,6 +112,7 @@ object Http {
   def errorToResult(e: Error): SimpleResult = e match {
     case E400(msg) => BadRequest(msg)
     case E403(msg) => Forbidden(msg)
+    case E404(msg) => NotFound(msg)
     case E500(msg) => InternalServerError(msg)
   }
 
