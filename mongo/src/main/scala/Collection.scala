@@ -45,6 +45,9 @@ final class Collection(db: DefaultDB, cname: String) {
   def insert[A](a: A)(implicit bp: BSONPickler[A], ec: ExecutionContext) =
     db.collection(cname).insert(toBSONDoc(a))
 
+  def insertMany[A](as: List[A])(implicit bp: BSONPickler[A], ec: ExecutionContext) =
+    db.collection(cname).bulkInsert(Enumerator(as.map(a => toBSONDoc(a)):_*))
+
   def update[Q, M](query: Q = EmptyQ, modifier: M = EmptyQ, upsert: Boolean = false, multi: Boolean = false)
     (implicit qbp: BSONPickler[Q], mbp: BSONPickler[M], ec: ExecutionContext) =
     db(cname).update(toBSONDoc(query), toBSONDoc(modifier), GetLastError(), upsert, multi)
