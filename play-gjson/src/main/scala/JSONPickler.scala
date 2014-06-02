@@ -101,7 +101,7 @@ object JSONPickler {
         val o = Json.obj(name -> hjp.pickle(l.head:V))
         tjp.pickle(l.tail) match {
           case a: JsArray => Json.arr(o) ++ a
-          case x => o ++ x.asInstanceOf[JsObject]
+          case x => JsObject((o ++ x.asInstanceOf[JsObject]).fields.filter(_._2 != JsNull))
         }
       }
       def unpickle(v: JsValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
