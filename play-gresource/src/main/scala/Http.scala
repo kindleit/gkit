@@ -89,8 +89,12 @@ object Http {
   def idK[A]: Kleisli[EFE, A, A] =
     liftK((a: A) => Future(a.right))
 
-  def constK[A, B](b: B): Kleisli[EFE, A, B] =
-    liftK((_: A) => Future(b.right))
+  def constK[A, B](b: Future[Error \/ B]): Kleisli[EFE, A, B] =
+    liftK((_: A) => b)
+
+  def askAReq = Kleisli.ask[EFE, AReq]
+
+  def askJReq = Kleisli.ask[EFE, JReq]
 
   def error[A]: Kleisli[EFE, Error, A] =
     liftK((e: Error) => Future(e.left))
