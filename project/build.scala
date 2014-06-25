@@ -10,7 +10,7 @@ object build extends Build {
     scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
     resolvers         ++= Seq(
       "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-      "Sonatype Snapshots"  at "http://oss.sonatype.org/content/repositories/snapshots/",
+      "Sonatype Snapshots"  at "https://oss.sonatype.org/content/repositories/snapshots/",
       "kindleit"            at "http://mvn.kitsd.com/repo/"),
     publishMavenStyle := true,
     credentials       += Credentials(Path.userHome / ".ivy2" / ".credentials"),
@@ -24,7 +24,7 @@ object build extends Build {
 
   val jodaTime      = "joda-time"         %  "joda-time"        % "2.3"
   val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.6"
-  val specs2        = "org.specs2"        %% "specs2"           % "2.3.12" % "test"
+  val specs2        = "org.specs2"        %% "specs2-core"      % "2.3.12-scalaz-7.1.0-M7" % "test"
   val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0-M7"
   val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0-M7"
   val shapeless     = "com.chuusai"       %%  "shapeless"       % "2.0.0"
