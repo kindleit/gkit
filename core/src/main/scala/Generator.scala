@@ -4,7 +4,7 @@ import shapeless._
 
 import scala.language.experimental.macros
 
-import scala.reflect.macros.Context
+import scala.reflect.macros.whitebox
 
 trait Generator[A] {
   def generate: A

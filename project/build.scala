@@ -6,11 +6,11 @@ object build extends Build {
   lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
     version            := "0.2.0-SNAPSHOT",
     organization       := "com.kindleit",
-    scalaVersion       := "2.10.4",
-    scalacOptions     ++= Seq("-feature", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
+    scalaVersion       := "2.11.1",
+    scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
     resolvers         ++= Seq(
       "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-      "Sonatype Snapshots"  at "http://oss.sonatype.org/content/repositories/snapshots/",
+      "Sonatype Snapshots"  at "https://oss.sonatype.org/content/repositories/snapshots/",
       "kindleit"            at "http://mvn.kitsd.com/repo/"),
     publishMavenStyle := true,
     credentials       += Credentials(Path.userHome / ".ivy2" / ".credentials"),
@@ -24,14 +24,14 @@ object build extends Build {
 
   val jodaTime      = "joda-time"         %  "joda-time"        % "2.3"
   val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.6"
-  val specs2        = "org.specs2"        %% "specs2"           % "2.3.10-scalaz-7.1.0-M6" % "test"
-  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0-M6"
-  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0-M6"
-  val shapeless     = "com.chuusai"       %  "shapeless_2.10.4" % "2.0.0"
-  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.10.0"
-  val play          = "com.typesafe.play" %% "play"             % "2.2.2"  % "provided"
-  val playJSON      = "com.typesafe.play" %% "play-json"        % "2.2.2"
-  val scalaReflect  = "org.scala-lang"    %  "scala-reflect"    % "2.10.3"
+  val specs2        = "org.specs2"        %% "specs2-core"      % "2.3.12-scalaz-7.1.0-M7" % "test"
+  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0-M7"
+  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0-M7"
+  val shapeless     = "com.chuusai"       %%  "shapeless"       % "2.0.0"
+  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.10.5.akka23-SNAPSHOT"
+  val play          = "com.typesafe.play" %% "play"             % "2.3.0"  % "provided"
+  val playJSON      = "com.typesafe.play" %% "play-json"        % "2.3.0"
+  val scalaReflect  = "org.scala-lang"    %  "scala-reflect"    % "2.11.1"
 
   lazy val gkit = Project(
     id        = "gkit",
