@@ -32,7 +32,7 @@ object Http {
   class Op[A]
     (bp: => BodyParser[A])
     (mkRoute: String => Route.ParamsExtractor)
-    (k: Kleisli[EFE, Req[A], SimpleResult])
+    (k: Kleisli[EFE, Req[A], Result])
       extends Routes { self =>
     private var path: String = ""
     lazy val route = mkRoute(prefix)
@@ -104,16 +104,16 @@ object Http {
   def jsonFromReq[A](implicit JP: JSONPickler[A]): Kleisli[EFE, JReq, A] =
     liftK(r => JP.unpickle(r.underlying.body).leftMap(E400(_):Error).point[Future])
 
-  def okResult[A]: Kleisli[EFE, A, SimpleResult] =
+  def okResult[A]: Kleisli[EFE, A, Result] =
     constK(Ok.right.point[Future])
 
-  def toJsonResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, A, SimpleResult] =
+  def toJsonResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, A, Result] =
     Kleisli((a: A) => Ok(JP.pickle(a)).point[EFE])
 
-  def optionToJsonResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, Option[A], SimpleResult] =
+  def optionToJsonResult[A](implicit JP: JSONPickler[A]): Kleisli[EFE, Option[A], Result] =
     Kleisli((oa: Option[A]) => oa.cata(a => Ok(JP.pickle(a)), NotFound).point[EFE])
 
-  def errorToResult(e: Error): SimpleResult = e match {
+  def errorToResult(e: Error): Result = e match {
     case E400(msg) => BadRequest(msg)
     case E403(msg) => Forbidden(msg)
     case E404(msg) => NotFound(msg)
@@ -131,18 +131,18 @@ object Http {
   def mkRoute(method: String)(path: Path)(prefix: String) =
     Route(method, PathPattern(mkPath(path, prefix)))
 
-  def get(path: Path)(k: Kleisli[EFE, AReq, SimpleResult]) =
+  def get(path: Path)(k: Kleisli[EFE, AReq, Result]) =
     new Op(BodyParsers.parse.anyContent)(mkRoute("GET")(path))(k)
 
-  def delete(path: Path)(k: Kleisli[EFE, AReq, SimpleResult]) =
+  def delete(path: Path)(k: Kleisli[EFE, AReq, Result]) =
     new Op(BodyParsers.parse.anyContent)(mkRoute("DELETE")(path))(k)
 
-  def jsonPost(path: Path)(k: Kleisli[EFE, JReq, SimpleResult]) =
+  def jsonPost(path: Path)(k: Kleisli[EFE, JReq, Result]) =
     new Op(BodyParsers.parse.json)(mkRoute("POST")(path))(k)
 
-  def jsonPut(path: Path)(k: Kleisli[EFE, JReq, SimpleResult]) =
+  def jsonPut(path: Path)(k: Kleisli[EFE, JReq, Result]) =
     new Op(BodyParsers.parse.json)(mkRoute("PUT")(path))(k)
 
-  def mfdPost[A](bp: => BodyParser[MultipartFormData[A]])(path: Path)(k: Kleisli[EFE, MFDReq[A], SimpleResult]) =
+  def mfdPost[A](bp: => BodyParser[MultipartFormData[A]])(path: Path)(k: Kleisli[EFE, MFDReq[A], Result]) =
     new Op(bp)(mkRoute("POST")(path))(k)
 }
