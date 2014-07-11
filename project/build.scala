@@ -1,9 +1,10 @@
 import sbt._
 import Keys._
+import sbtunidoc.Plugin.unidocSettings
 
 object build extends Build {
 
-  lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
+  lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ Seq(
     version            := "0.2.0-SNAPSHOT",
     organization       := "com.kindleit",
     scalaVersion       := "2.11.1",
