@@ -2,6 +2,12 @@
 
 GKit is a set of combinator libraries which can ultimately be turned into powerful, composable REST servers.
 
+### Download ###
+
+The gkit packages should make there way into oss.sonatype.com and eventually maven central. But you can always download them manually, or be notified of version updates on bintray:
+
+[ ![Download](https://api.bintray.com/packages/kitsd/releases/gkit/images/download.png) ](https://bintray.com/kitsd/releases/gkit/_latestVersion)
+
 ### It's written on top of [shapeless](https://github.com/milessabin/shapeless) & [scalaz](https://github.com/scalaz/scalaz/)  ###
 
 
