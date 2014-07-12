@@ -1,27 +1,23 @@
 import sbt._
 import Keys._
 import sbtunidoc.Plugin.unidocSettings
+import bintray.Plugin.bintraySettings
+import bintray.Keys._
 
 object build extends Build {
 
-  lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ Seq(
+  lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
     version            := "0.2.0-SNAPSHOT",
     organization       := "com.kindleit",
     scalaVersion       := "2.11.1",
     scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
     resolvers         ++= Seq(
       "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-      "Sonatype Snapshots"  at "https://oss.sonatype.org/content/repositories/snapshots/",
-      "kindleit"            at "http://mvn.kitsd.com/repo/"),
+      "Sonatype Snapshots"  at "https://oss.sonatype.org/content/repositories/snapshots/"),
     publishMavenStyle := true,
-    credentials       += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-    publishTo         := {
-      val kitsd = "http://mvn.kitsd.com/"
-      if (version.value.trim.endsWith("SNAPSHOT"))
-        Some("snapshots" at kitsd + "snapshots")
-      else
-        Some("releases"  at kitsd + "releases")
-    })
+    bintrayOrganization in bintray := Some("kitsd"),
+    repository in bintray := "releases",
+    licenses          += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")))
 
   val jodaTime      = "joda-time"         %  "joda-time"        % "2.3"
   val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.6"
