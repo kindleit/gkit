@@ -15,16 +15,33 @@ The point of GKit is to eliminate as much boilerplate as possible while at the s
 
 You can quickly write a RESTful resource with a find query with the following code:
 
-```
-#!scala
+```scala
 
-import reactivemongo.bson.BSONObjectID
+import gkit.mongo._
+import play.api.Play.current
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.libs.json._
+import play.api.mvc.Result
+import play.modules.gjson._
+import play.modules.gresource.Http
+import play.modules.gresource.Http._
+import play.modules.gresource.mongo._
+import reactivemongo.bson.{BSONObjectID, BSONDocument}
+import scala.concurrent.Future
+import scalaz.Scalaz._
+import scalaz._
 
 case class Todo
   (
     _id             : BSONObjectID
   , description     : String
   , completed       : Boolean
+  )
+
+case class FindParams
+  (
+    sortby          : Option[String]
+  , asc             : Option[Boolean]
   )
 
 object Todos extends TodoFunctions {
@@ -34,8 +51,6 @@ object Todos extends TodoFunctions {
 trait TodoFunctions extends QueryFunctions {
 
   val cname = "todos"
-
-  val idLens = lens[Todo] >> '_id
 
   def httpFind: Kleisli[EFE, AReq, Result] =
     paramsFromReq[FindParams].apply >>>
@@ -47,6 +62,44 @@ trait TodoFunctions extends QueryFunctions {
       query    = EmptyQ,
       proj     = EmptyQ,
       defaults = fp)
+}
+
+trait QueryFunctions extends JSONPicklerInstances {
+
+  case class FindQuery[A, B](query: A, proj: B, defaults: FindParams)
+
+  class Find[A] {
+    def apply[B, C](cname: String)(fq: FindQuery[B, C])
+      (implicit BP1: BSONPickler[A], BP2: BSONPickler[B], BP3: BSONPickler[C]): Future[Error \/ List[A]] = {
+      val sortby = fq.defaults.sortby | "_id"
+      val asc = fq.defaults.asc | true
+      val sdoc = BSONDocument(sortby -> asc.fold(1, -1))
+      val qb = dbe.collection(cname).find(fq.query, fq.proj).sort(sdoc)
+      qb.cursor[A].collect[List]().map(_.leftMap(E500(_):Error))
+    }
+  }
+
+  def find[A] = new Find[A]
+
+  def dbe = GMongoPlugin.dbEnv
+}
+
+trait JSONPicklerInstances {
+
+  implicit def BSONObjectIDPickler: JSONPickler[BSONObjectID] =
+    new JSONPickler[BSONObjectID] {
+      def pickle(boid: BSONObjectID): JsValue = JsString(boid.stringify)
+
+      def unpickle(v: JsValue, path: List[String]): String \/ BSONObjectID = {
+        def parse(s: String) =
+          try { BSONObjectID(s).right } catch { case e: Throwable => e.getMessage.left }
+
+        for {
+          js <- typecheck[JsString](v, path)(identity)
+          id <- parse(js.value).leftMap(e => s"""error at: `${path.mkString(".")}`: $e""")
+        } yield id
+      }
+    }
 }
 ```
 
@@ -62,7 +115,7 @@ These libraries are still very much a work in progress and some of the API is no
 We definitely need some help, and here are our planned features
 * Some libraries are missing tests
 * Finishing the SQL combinators
-* Adding support for the new Akka http 
+* Adding support for the new Akka http
 
 ### Contributing ###
 
