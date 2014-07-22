@@ -7,7 +7,7 @@ import bintray.Keys._
 object build extends Build {
 
   lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
-    version            := "0.2.0-SNAPSHOT",
+    version            := "0.2.0",
     organization       := "com.kindleit",
     scalaVersion       := "2.11.1",
     scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
