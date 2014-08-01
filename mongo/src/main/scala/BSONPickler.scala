@@ -39,13 +39,15 @@ object BSONPickler {
   implicit def DoubleBSONPickler: BSONPickler[Double] = new BSONPickler[Double] {
     def pickle(s: Double): BSONValue = BSONDouble(s)
     def unpickle(v: BSONValue, path: List[String]): String \/ Double =
-      typecheck[BSONDouble](v, path)(_.value)
+      typecheck[BSONDouble](v, path)(_.value) |||
+      typecheck[BSONInteger](v, path)(_.value).map(_.toDouble)
   }
 
   implicit def IntBSONPickler: BSONPickler[Int] = new BSONPickler[Int] {
     def pickle(s: Int): BSONValue = BSONInteger(s)
     def unpickle(v: BSONValue, path: List[String]): String \/ Int =
-      typecheck[BSONInteger](v, path)(_.value)
+      typecheck[BSONInteger](v, path)(_.value) |||
+      typecheck[BSONDouble](v, path)(_.value).map(_.toInt)
   }
 
   implicit def DateTimeBSONPickler: BSONPickler[DateTime] = new BSONPickler[DateTime] {
