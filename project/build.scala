@@ -6,10 +6,12 @@ import bintray.Keys._
 
 object build extends Build {
 
+  val scalaV = "2.11.3"
+
   lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
     version            := "0.3.0-SNAPSHOT",
     organization       := "com.kindleit",
-    scalaVersion       := "2.11.1",
+    scalaVersion       := scalaV,
     scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
     resolvers         ++= Seq(
       "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
@@ -19,16 +21,16 @@ object build extends Build {
     repository in bintray := "releases",
     licenses          += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")))
 
-  val jodaTime      = "joda-time"         %  "joda-time"        % "2.3"
-  val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.6"
-  val specs2        = "org.specs2"        %% "specs2-core"      % "2.3.12-scalaz-7.1.0-M7" % "test"
-  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0-M7"
-  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0-M7"
+  val scalaReflect  = "org.scala-lang"    %  "scala-reflect"    % scalaV
+  val jodaTime      = "joda-time"         %  "joda-time"        % "2.5"
+  val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.7"
+  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0"
+  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0"
   val shapeless     = "com.chuusai"       %%  "shapeless"       % "2.0.0"
-  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.10.5.akka23-SNAPSHOT"
-  val play          = "com.typesafe.play" %% "play"             % "2.3.0"  % "provided"
-  val playJSON      = "com.typesafe.play" %% "play-json"        % "2.3.0"
-  val scalaReflect  = "org.scala-lang"    %  "scala-reflect"    % "2.11.1"
+  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.10.5.0.akka23"
+  val specs2        = "org.specs2"        %% "specs2-core"      % "2.4.6" % "test"
+  val play          = "com.typesafe.play" %% "play"             % "2.3.0" % "provided"
+  val playJSON      = "com.typesafe.play" %% "play-json"        % "2.3.0" % "provided"
 
   lazy val gkit = Project(
     id        = "gkit",

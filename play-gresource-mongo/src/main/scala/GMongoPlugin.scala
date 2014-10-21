@@ -53,9 +53,9 @@ object GMongoPlugin {
     val (dbName, servers, auth) = c.getString("mongodb.uri") match {
       case Some(uri) =>
         MongoConnection.parseURI(uri) match {
-          case Success(MongoConnection.ParsedURI(hosts, Some(db), auth)) =>
+          case Success(MongoConnection.ParsedURI(hosts, _, _, Some(db), auth)) =>
             (db, hosts.map(h => h._1 + ":" + h._2), auth.toList)
-          case Success(MongoConnection.ParsedURI(_, None, _)) =>
+          case Success(MongoConnection.ParsedURI(_, _, _, None, _)) =>
             throw c.globalError(s"Missing database name in mongodb.uri '$uri'")
           case Failure(e) => throw c.globalError(s"Invalid mongodb.uri '$uri'", Some(e))
         }
