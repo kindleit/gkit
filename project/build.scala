@@ -9,7 +9,7 @@ object build extends Build {
   val scalaV = "2.11.3"
 
   lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
-    version            := "0.4.0-SNAPSHOT",
+    version            := "0.5.0-SNAPSHOT",
     organization       := "com.kindleit",
     scalaVersion       := scalaV,
     scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
@@ -36,7 +36,7 @@ object build extends Build {
     id        = "gkit",
     base      = file("."),
     settings  = defaultSettings,
-    aggregate = Seq(core, mongo, sql, playGJSON, playGResource, playGResourceMongo, playGResourceSQL))
+    aggregate = Seq(core, mongo, sql, playGJSON, playGResource, playGResourceMongo))
 
   lazy val core = Project(
     id       = "core",
@@ -84,12 +84,4 @@ object build extends Build {
       name                := "play-gresource-mongo",
       libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, play)),
     dependencies = Seq(mongo, playGJSON, playGResource))
-
-  lazy val playGResourceSQL = Project(
-    id       = "play-gresource-sql",
-    base     = file("play-gresource-sql"),
-    settings = defaultSettings ++ Seq(
-      name                := "play-gresource-sql",
-      libraryDependencies ++= Seq(jodaTime, jodaConvert, scalaz, play)),
-    dependencies = Seq(sql, playGJSON, playGResource))
 }
