@@ -28,7 +28,7 @@ trait FromResultSet[A] {
 
 object FromResultSet {
 
-  implicit def apply[A](implicit ev: LabelledProductTypeClass[FromResultSet]): FromResultSet[A] =
+  implicit def apply[A](implicit ev: ProductTypeClass[FromResultSet]): FromResultSet[A] =
     macro GenericMacros.deriveProductInstance[FromResultSet, A]
 
   implicit def BooleanFromResultSet: FromResultSet[Boolean] = new FromResultSet[Boolean] {
