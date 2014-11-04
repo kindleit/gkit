@@ -17,9 +17,8 @@ import scalaz.syntax.traverse._
 import shapeless._
 import shapeless.record._
 
-trait BSONPickler[A] extends Pickler[A, BSONValue]
-
 object BSONPickler {
+  import Pickler._
 
   implicit def apply[A](implicit ev: LabelledTypeClass[BSONPickler]): BSONPickler[A] =
     macro GenericMacros.deriveLabelledInstance[BSONPickler, A]
@@ -54,18 +53,6 @@ object BSONPickler {
     def pickle(dt: DateTime): BSONValue = BSONDateTime(dt.getMillis)
     def unpickle(v: BSONValue, path: List[String]): String \/ DateTime =
       typecheck[BSONDateTime](v, path)(dt => new DateTime(dt.value))
-  }
-
-  implicit def BSONObjectIDPickler: BSONPickler[BSONObjectID] = new BSONPickler[BSONObjectID] {
-    def pickle(boid: BSONObjectID): BSONValue = boid
-    def unpickle(v: BSONValue, path: List[String]): String \/ BSONObjectID =
-      typecheck[BSONObjectID](v, path)(identity)
-  }
-
-  implicit def BSONDocumentPickler: BSONPickler[BSONDocument] = new BSONPickler[BSONDocument] {
-    def pickle(doc: BSONDocument): BSONValue = doc
-    def unpickle(v: BSONValue, path: List[String]): String \/ BSONDocument =
-      typecheck[BSONDocument](v, path)(identity)
   }
 
   implicit def OptionBSONPickler[T](implicit bp: BSONPickler[T]): BSONPickler[Option[T]] = new BSONPickler[Option[T]] {

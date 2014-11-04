@@ -11,6 +11,7 @@ import scalaz.syntax.either._
 import scalaz.syntax.std.option._
 
 trait PicklerInstances {
+  import gkit.Pickler._
 
   implicit def BSONObjectIDPickler: JSONPickler[BSONObjectID] =
     new JSONPickler[BSONObjectID] {

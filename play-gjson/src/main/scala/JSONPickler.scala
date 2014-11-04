@@ -17,9 +17,12 @@ import scalaz.syntax.traverse._
 import shapeless._
 import shapeless.record._
 
-trait JSONPickler[A] extends Pickler[A, JsValue]
+object `package` {
+  type JSONPickler[A] = Pickler[A, JsValue]
+}
 
 object JSONPickler {
+  import Pickler._
 
   implicit def apply[A](implicit ev: LabelledTypeClass[JSONPickler]): JSONPickler[A] =
     macro GenericMacros.deriveLabelledInstance[JSONPickler, A]
