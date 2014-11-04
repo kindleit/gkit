@@ -17,7 +17,7 @@ import scalaz.syntax.traverse._
 import shapeless._
 import shapeless.record._
 
-object BSONPickler {
+object BSONP {
   import Pickler._
 
   implicit def apply[A](implicit ev: LabelledTypeClass[BSONPickler]): BSONPickler[A] =
@@ -62,9 +62,9 @@ object BSONPickler {
       else bp.unpickle(v, path).map(Some(_))
   }
 
-  implicit def ListBSONPickler[T](implicit bp: BSONPickler[T]): BSONPickler[List[T]] = new BSONPickler[List[T]] {
-    def pickle(t: List[T]): BSONValue = BSONArray(t.map(bp.pickle))
-    def unpickle(v: BSONValue, path: List[String]): String \/ List[T] = for {
+  implicit def ListBSONPickler[T](implicit bp: BSONPickler[T]): BSONArrPickler[List[T]] = new BSONArrPickler[List[T]] {
+    def pickle(t: List[T]): BSONArray = BSONArray(t.map(bp.pickle))
+    def unpickle(v: BSONArray, path: List[String]): String \/ List[T] = for {
       ps <- typecheck[BSONArray](v, path)(_.values.map(bp.unpickle(_, path)))
       r  <- ps.toList.sequence[({type t[T] = String \/ T})#t, T]
     } yield r
@@ -77,34 +77,28 @@ object BSONPickler {
     }
 
   implicit def HListBSONPickler[H, T <: HList]
-    (implicit hbp: BSONPickler[H], tbp: BSONPickler[T]): BSONPickler[H :: T] =
-    new BSONPickler[H :: T] {
-      def pickle(l: H :: T): BSONValue = {
+    (implicit hbp: BSONPickler[H], tbp: BSONPickler[T]): BSONArrPickler[H :: T] =
+    new BSONArrPickler[H :: T] {
+      def pickle(l: H :: T): BSONArray = {
         val h = BSONArray(hbp.pickle(l.head))
         val t = tbp.pickle(l.tail)
-        h ++ (if (t == BSONDocument()) BSONArray() else t).asInstanceOf[BSONArray]
+        h ++ (if (t == BSONDocument()) BSONArray() else t)
       }
-      def unpickle(v: BSONValue, path: List[String]): String \/ (H :: T) = ???
+      def unpickle(v: BSONArray, path: List[String]): String \/ (H :: T) = ???
     }
 
   implicit def RecordBSONPickler[F, V, T <: HList]
-    (implicit hbp: BSONPickler[V], tbp: BSONPickler[T], wk: Witness.Aux[F]): BSONPickler[FieldType[F, V] :: T] =
-    new BSONPickler[FieldType[F, V] :: T] {
+    (implicit hbp: BSONPickler[V], tbp: BSONDocPickler[T], wk: Witness.Aux[F]): BSONDocPickler[FieldType[F, V] :: T] =
+    new BSONDocPickler[FieldType[F, V] :: T] {
       val name = wk.value match {
         case s: Symbol => s.toString.drop(1)
         case a: Any    => a.toString
       }
-      def pickle(l: FieldType[F, V] :: T): BSONValue = {
-        val d = BSONDocument(wk.value.toString -> hbp.pickle(l.head:V))
-        tbp.pickle(l.tail) match {
-          case a: BSONArray => BSONArray(d) ++ a
-          case x =>
-            val r = d ++ x.asInstanceOf[BSONDocument]
-            BSONDocument(r.elements.filter(_._2 != BSONUndefined))
-        }
+      def pickle(l: FieldType[F, V] :: T): BSONDocument = {
+        val r = BSONDocument(wk.value.toString -> hbp.pickle(l.head:V)) ++ tbp.pickle(l.tail)
+        BSONDocument(r.elements.filter(_._2 != BSONUndefined))
       }
-      def unpickle(v: BSONValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
-        d <- typecheck[BSONDocument](v, path)(identity)
+      def unpickle(d: BSONDocument, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
         v <- d.get(name).cata(_.right, s"""field `${(path :+ name).mkString(".")}' not found""".left)
         h <- hbp.unpickle(v, path :+ name)
         t <- tbp.unpickle(BSONDocument(d.elements.filter(_ != (name, v))), path)
@@ -121,7 +115,10 @@ object BSONPickler {
     override def product[H, T <: HList](name: String, BPH: BSONPickler[H], BPT: BSONPickler[T]): BSONPickler[H :: T] =
       new BSONPickler[H :: T] {
         def pickle(l: H :: T): BSONValue = {
-          val r = BSONDocument(name -> BPH.pickle(l.head)) ++ BPT.pickle(l.tail).asInstanceOf[BSONDocument]
+          val r = BSONDocument(name -> BPH.pickle(l.head)) ++ (BPT.pickle(l.tail) match {
+            case x: BSONDocument => x
+            case _ => BSONDocument()
+            })
           BSONDocument(r.elements.filter(_._2 != BSONUndefined))
         }
         def unpickle(v: BSONValue, path: List[String]): String \/ (H :: T) = for {

@@ -28,7 +28,7 @@ case class QueryBuilder
       fromBSON[A](doc).valueOr(e => throw new RuntimeException(e))
   }
 
-  def sort[A](order: A)(implicit bp: BSONPickler[A]): QueryBuilder =
+  def sort[A](order: A)(implicit bp: BSONDocPickler[A]): QueryBuilder =
     copy(queryBuilder = queryBuilder.sort(toBSONDoc(order)))
 
   def take(n: Int): QueryBuilder = copy(upTo = n)
