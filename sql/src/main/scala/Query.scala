@@ -16,7 +16,7 @@ import scalaz.syntax.std.boolean._
 
 import scalaz._
 
-object Queries {
+object Query {
 
   type KIOC[A] = Kleisli[IO, Connection, A]
 
