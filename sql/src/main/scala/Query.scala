@@ -20,49 +20,93 @@ object Query {
 
   type KIOC[A] = Kleisli[IO, Connection, A]
 
-  class ExecuteResult(s: PreparedStatement, srs: String \/ ResultSet) {
+  type Result[A] = EitherT[KIOC, String, A]
 
-    def first[A](implicit frs: FromResultSet[A]): Kleisli[IO, Connection, String \/ Option[A]] =
+  def resultLeft[A](s: String): Result[A] =
+    EitherT(IO(s.left[A]).liftIO[KIOC])
+
+  def resultRight[A](a: A): Result[A] =
+    EitherT(IO(a.right[String]).liftIO[KIOC])
+
+  class Execute(er: Result[ExecuteResult]) {
+
+    def first[A](implicit frs: FromResultSet[A]): Result[Option[A]] =
+      er.flatMap(_.first[A])
+
+    def toList[A](implicit frs: FromResultSet[A]): Result[List[A]] =
+      er.flatMap(_.toList[A])
+
+    def toInt: Result[Int] =      
+      er.flatMap(_.first[Int]).map(_.getOrElse(0))
+  }
+
+  class ExecuteResult(s: PreparedStatement, rs: ResultSet) {
+
+    def first[A](implicit frs: FromResultSet[A]): Result[Option[A]] =
       for {
-        a  <- IO(srs.fold(_.left, rs => rs.next().fold(frs.fromResultSet(rs, 1).map(Some(_)), None.right))).liftIO[KIOC]
-        _  <- IO(s).using(_ => IO.ioUnit).liftIO[KIOC]
+        a  <- EitherT(IO(readOne(rs)).liftIO[KIOC])
+        _  <- IO(s).using(_ => IO.ioUnit).liftIO[Result]
       } yield a
 
-    def toList[A](implicit frs: FromResultSet[A]): Kleisli[IO, Connection, String \/ List[A]] =
+    def toList[A](implicit frs: FromResultSet[A]): Result[List[A]] =
       for {
-        as <- srs.fold(e => IO(e.left), rs => readAll(rs)).liftIO[KIOC]
-        _  <- IO(s).using(_ => IO.ioUnit).liftIO[KIOC]
+        as <- EitherT(IO(readAll(rs)).liftIO[KIOC])
+        _  <- IO(s).using(_ => IO.ioUnit).liftIO[Result]
       } yield as
+
+    private def readOne[A](rs: ResultSet)(implicit frs: FromResultSet[A]): String \/ Option[A] =
+      \/.fromTryCatchNonFatal(rs.next()).fold(
+        _.getMessage.left,
+        _.fold(frs.fromResultSet(rs, 1).map(Some(_)), None.right))
+
+    private def readAll[A](rs: ResultSet)(implicit frs: FromResultSet[A]): String \/ List[A] = {
+      import scalaz.syntax.traverse._
+      val lf = new ListBuffer[String \/ A]
+      \/.fromTryCatchNonFatal(while (rs.next()) lf += frs.fromResultSet(rs, 1)).fold(
+        _.getMessage.left,
+        _ => lf.toList.sequenceU)
+    }
   }
 
-  def delete(q: String): Kleisli[IO, Connection, Int] = for {
-    s <- Kleisli.ask[IO, Connection].map(_.createStatement)
-    r <- IO(s.executeUpdate(q)).liftIO[KIOC]
-    _ <- IO(s).using(_ => IO.ioUnit).liftIO[KIOC]
-  } yield r
+  import Scalaz._
 
-  def readAll[A](rs: ResultSet)(implicit frs: FromResultSet[A]) = IO {
-    import scalaz.syntax.traverse._
-    val lf = new ListBuffer[String \/ A]
-    while (rs.next()) lf += frs.fromResultSet(rs, 1)
-    lf.toList.sequenceU
-  }
+  def execute[A](q: String)(a: A)(implicit ts: ToStatement[A]): Execute =
+    new Execute(for {
+      s  <- EitherT[KIOC, String, PreparedStatement](Kleisli.ask[IO, Connection].map(prepareStmt(q)))
+      _  <- EitherT(IO(ts.toStatement(a, s)).liftIO[KIOC])
+      rs <- EitherT(IO(executeQuery(s)).liftIO[KIOC])
+    } yield new ExecuteResult(s, rs))
 
-  def execute[A](q: String)(a: A)(implicit ts: ToStatement[A]): Kleisli[IO, Connection, ExecuteResult] = for {
-    s  <- Kleisli.ask[IO, Connection].map(_.prepareStatement(q))
-    fr <- IO(ts.toStatement(a, s)).liftIO[KIOC]
-    rs <- fr.traverse(s => IO(s.executeQuery()).liftIO[KIOC])
-  } yield new ExecuteResult(s, rs)
+  def execute1(q: String): Execute =
+    new Execute(for {
+      s  <- EitherT[KIOC, String, PreparedStatement](Kleisli.ask[IO, Connection].map(prepareStmt(q)))
+      rs <- EitherT(IO(executeQuery(s)).liftIO[KIOC])
+    } yield new ExecuteResult(s, rs))
 
-  def execute1(q: String): Kleisli[IO, Connection, ExecuteResult] = for {
-    s  <- Kleisli.ask[IO, Connection].map(_.prepareStatement(q))
-    rs <- IO(s.executeQuery()).liftIO[KIOC]
-  } yield new ExecuteResult(s, rs.right[String])
+  def update[A](q: String)(a: A)(implicit ts: ToStatement[A]): Result[Int] =
+    for {
+      s  <- EitherT[KIOC, String, PreparedStatement](Kleisli.ask[IO, Connection].map(prepareStmt(q)))
+      _  <- EitherT(IO(ts.toStatement(a, s)).liftIO[KIOC])
+      er <- EitherT(IO(executeUpdate(s)(q)).liftIO[KIOC])
+      _  <- IO(s).using(_ => IO.ioUnit).liftIO[Result]
+    } yield er
 
-  def update[A](q: String)(a: A)(implicit ts: ToStatement[A]) = for {
-    s  <- Kleisli.ask[IO, Connection].map(_.prepareStatement(q))
-    fr <- IO(ts.toStatement(a, s)).liftIO[KIOC]
-    er <- fr.traverse(s => IO(s.executeUpdate()).liftIO[KIOC])
-    _  <- IO(s).using(_ => IO.ioUnit).liftIO[KIOC]
-  } yield er
+  def update1(q: String): Result[Int] =
+    for {
+      s <- EitherT[KIOC, String, Statement](Kleisli.ask[IO, Connection].map(createStmt))
+      r <- EitherT(IO(executeUpdate(s)(q)).liftIO[KIOC])
+      _ <- IO(s).using(_ => IO.ioUnit).liftIO[Result]
+    } yield r
+
+  private def executeQuery(ps: PreparedStatement): String \/ ResultSet =
+    \/.fromTryCatchNonFatal(ps.executeQuery()).leftMap(_.getMessage)
+
+  private def executeUpdate(s: Statement)(q: String): String \/ Int =
+    \/.fromTryCatchNonFatal(s.executeUpdate(q)).leftMap(_.getMessage)
+
+  private def createStmt(c: Connection): String \/ Statement =
+    \/.fromTryCatchNonFatal(c.createStatement).leftMap(_.getMessage) 
+
+  private def prepareStmt(q: String)(c: Connection): String \/ PreparedStatement =
+    \/.fromTryCatchNonFatal(c.prepareStatement(q)).leftMap(_.getMessage)
 }
