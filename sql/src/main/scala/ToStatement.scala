@@ -1,6 +1,6 @@
 package gkit.sql
 
-import java.sql.{ Types, SQLException, PreparedStatement, Date => SqlDate }
+import java.sql.{ Types, SQLException, PreparedStatement, Timestamp, Date => SqlDate}
 
 import java.util.{ Date => JavaDate }
 
@@ -70,12 +70,12 @@ object ToStatement {
 
   implicit def JavaDateToStatement: ToStatement[JavaDate] = new ToStatement[JavaDate] {
     def toStatement(jd: JavaDate, ps: PreparedStatement, index: Int): String \/ PreparedStatement =
-      using(ps)(_.setDate(index, new SqlDate(jd.getTime)))
+      using(ps)(_.setTimestamp(index, new Timestamp(jd.getTime)))
   }
 
   implicit def JodaDateTimeToStatement: ToStatement[DateTime] = new ToStatement[DateTime] {
     def toStatement(jd: DateTime, ps: PreparedStatement, index: Int): String \/ PreparedStatement =
-      using(ps)(_.setDate(index, new SqlDate(jd.getMillis)))
+      using(ps)(_.setTimestamp(index, new Timestamp(jd.getMillis)))
   }
 
   implicit def OptionToStatement[A](implicit ts: ToStatement[A]): ToStatement[Option[A]] =

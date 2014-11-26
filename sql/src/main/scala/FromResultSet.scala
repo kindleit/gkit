@@ -1,6 +1,6 @@
 package gkit.sql
 
-import java.sql.{ SQLException, ResultSet, PreparedStatement, Date => SqlDate }
+import java.sql.{ SQLException, ResultSet, PreparedStatement, Timestamp, Date => SqlDate }
 
 import java.util.{ Date => JavaDate }
 
@@ -73,13 +73,13 @@ object FromResultSet {
 
   implicit def JavaDateFromResultSet: FromResultSet[JavaDate] = new FromResultSet[JavaDate] {
     def fromResultSet(rs: ResultSet, col: Int): String \/ JavaDate =
-      fromResultSet(rs)(_.getDate(col))
+      fromResultSet(rs)(_.getTimestamp(col))
   }
 
   implicit def JodaDateTimeFromResultSet: FromResultSet[DateTime] = new FromResultSet[DateTime] {
     def fromResultSet(rs: ResultSet, col: Int): String \/ DateTime =
       fromResultSet(rs) { rs =>
-        val r = rs.getDate(col)
+        val r = rs.getTimestamp(col)
         if (r != null) new DateTime(r.getTime) else null
       }
   }
