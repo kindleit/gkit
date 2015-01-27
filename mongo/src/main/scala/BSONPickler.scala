@@ -79,14 +79,18 @@ object BSONPickler {
     def pickle(t: List[T]): BSONValue = BSONArray(t.map(bp.pickle))
     def unpickle(v: BSONValue, path: List[String]): String \/ List[T] = for {
       ps <- typecheck[BSONArray](v, path)(_.values.map(bp.unpickle(_, path)))
-      r  <- ps.toList.sequence[({type t[T] = String \/ T})#t, T]
+      r  <- ps.toList.sequenceU
     } yield r
   }
 
   implicit def HNilBSONPickler: BSONPickler[HNil] =
     new BSONPickler[HNil] {
       def pickle(nil: HNil): BSONValue = BSONDocument()
-      def unpickle(v: BSONValue, path: List[String]): String \/ HNil = HNil.right
+      def unpickle(v: BSONValue, path: List[String]): String \/ HNil = v match {
+        case d: BSONDocument if d.isEmpty => HNil.right
+        case _ => "HNil must map to an empty document".left
+      }
+
     }
 
   implicit def HListBSONPickler[H, T <: HList]
