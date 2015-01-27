@@ -69,7 +69,7 @@ object BSONPickler {
   }
 
   implicit def OptionBSONPickler[T](implicit bp: BSONPickler[T]): BSONPickler[Option[T]] = new BSONPickler[Option[T]] {
-    def pickle(t: Option[T]): BSONValue = t.map(bp.pickle).getOrElse(BSONUndefined)
+    def pickle(t: Option[T]): BSONValue = t.map(bp.pickle) | BSONUndefined
     def unpickle(v: BSONValue, path: List[String]): String \/ Option[T] =
       if (v == BSONUndefined || v == BSONNull) None.right
       else bp.unpickle(v, path).map(Some(_))
@@ -85,46 +85,40 @@ object BSONPickler {
 
   implicit def HNilBSONPickler: BSONPickler[HNil] =
     new BSONPickler[HNil] {
-      def pickle(nil: HNil): BSONValue = BSONDocument()
-      def unpickle(v: BSONValue, path: List[String]): String \/ HNil = v match {
-        case d: BSONDocument if d.isEmpty => HNil.right
-        case _ => "HNil must map to an empty document".left
-      }
-
+      def pickle(nil: HNil): BSONValue = BSONArray()
+      def unpickle(v: BSONValue, path: List[String]): String \/ HNil = HNil.right
     }
 
   implicit def HListBSONPickler[H, T <: HList]
     (implicit hbp: BSONPickler[H], tbp: BSONPickler[T]): BSONPickler[H :: T] =
     new BSONPickler[H :: T] {
-      def pickle(l: H :: T): BSONValue = {
-        val h = BSONArray(hbp.pickle(l.head))
-        val t = tbp.pickle(l.tail)
-        h ++ (if (t == BSONDocument()) BSONArray() else t).asInstanceOf[BSONArray]
+      def pickle(l: H :: T): BSONValue = BSONArray(hbp.pickle(l.head)) ++ tbp.pickle(l.tail).asInstanceOf[BSONArray]
+      def unpickle(v: BSONValue, path: List[String]): String \/ (H :: T) = v match {
+        case a: BSONArray => for { h <- hbp.unpickle (a.values.head); t <- tbp.unpickle (BSONArray(a.values.tail)) } yield h :: t
+        case _ => "Only BSONArrays can be unpickled to an HList".left
       }
-      def unpickle(v: BSONValue, path: List[String]): String \/ (H :: T) = ???
     }
 
   implicit def RecordBSONPickler[F, V, T <: HList]
     (implicit hbp: BSONPickler[V], tbp: BSONPickler[T], wk: Witness.Aux[F]): BSONPickler[FieldType[F, V] :: T] =
     new BSONPickler[FieldType[F, V] :: T] {
+      import scala.util.Try
       val name = wk.value match {
         case s: Symbol => s.toString.drop(1)
         case a: Any    => a.toString
       }
-      def pickle(l: FieldType[F, V] :: T): BSONValue = {
-        val d = BSONDocument(wk.value.toString -> hbp.pickle(l.head:V))
-        tbp.pickle(l.tail) match {
-          case a: BSONArray => BSONArray(d) ++ a
-          case x =>
-            val r = d ++ x.asInstanceOf[BSONDocument]
-            BSONDocument(r.elements.filter(_._2 != BSONUndefined))
-        }
+      def pickle(l: FieldType[F, V] :: T): BSONValue = hbp.pickle(l.head:V) match {
+        case BSONUndefined if l.tail == HNil => BSONDocument()
+        case BSONUndefined => tbp.pickle(l.tail)
+        case v if l.tail == HNil => BSONDocument(name -> v)
+        case v => BSONDocument(Try(name -> v) #:: (tbp.pickle(l.tail).asInstanceOf[BSONDocument]).stream)
       }
       def unpickle(v: BSONValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
         d <- typecheck[BSONDocument](v, path)(identity)
         v <- d.get(name).cata(_.right, s"""field `${(path :+ name).mkString(".")}' not found""".left)
+        o =  d.elements.withFilter(_._1 != name).map(identity)
         h <- hbp.unpickle(v, path :+ name)
-        t <- tbp.unpickle(BSONDocument(d.elements.filter(_ != (name, v))), path)
+        t <- tbp.unpickle(BSONDocument(o), path)
       } yield field[F](h) :: t
     }
 
@@ -135,17 +129,21 @@ object BSONPickler {
       def unpickle(b: BSONValue, path: List[String]): String \/ HNil = HNil.right
     }
 
-    override def product[H, T <: HList](name: String, BPH: BSONPickler[H], BPT: BSONPickler[T]): BSONPickler[H :: T] =
+    def product[H, T <: HList](name: String, BPH: BSONPickler[H], BPT: BSONPickler[T]): BSONPickler[H :: T] =
       new BSONPickler[H :: T] {
-        def pickle(l: H :: T): BSONValue = {
-          val r = BSONDocument(name -> BPH.pickle(l.head)) ++ BPT.pickle(l.tail).asInstanceOf[BSONDocument]
-          BSONDocument(r.elements.filter(_._2 != BSONUndefined))
+        import scala.util.Try
+        def pickle(l: H :: T): BSONValue = BPH.pickle(l.head) match {
+          case BSONUndefined if l.tail == HNil => BSONDocument()
+          case BSONUndefined => BPT.pickle(l.tail)
+          case v if l.tail == HNil => BSONDocument(name -> v)
+          case v => BSONDocument(Try(name -> v) #:: (BPT.pickle(l.tail).asInstanceOf[BSONDocument]).stream)
         }
         def unpickle(v: BSONValue, path: List[String]): String \/ (H :: T) = for {
           d <- typecheck[BSONDocument](v, path)(identity)
           v <- d.get(name).cata(_.right, BSONUndefined.right)
+          o =  d.elements.withFilter(_._1 != name).map(identity)
           h <- BPH.unpickle(v, path :+ name)
-          t <- BPT.unpickle(BSONDocument(d.elements.filter(_ != (name, v))))
+          t <- BPT.unpickle(BSONDocument(o))
         } yield h :: t
       }
 
