@@ -116,7 +116,7 @@ object BSONPickler {
       def unpickle(v: BSONValue, path: List[String]): String \/ (FieldType[F, V] :: T) = for {
         d <- typecheck[BSONDocument](v, path)(identity)
         v <- d.get(name).cata(_.right, s"""field `${(path :+ name).mkString(".")}' not found""".left)
-        o =  d.elements.withFilter(_._1 != name).map(identity)
+        o =  d.elements.filter(_._1 != name)
         h <- hbp.unpickle(v, path :+ name)
         t <- tbp.unpickle(BSONDocument(o), path)
       } yield field[F](h) :: t
@@ -141,7 +141,7 @@ object BSONPickler {
         def unpickle(v: BSONValue, path: List[String]): String \/ (H :: T) = for {
           d <- typecheck[BSONDocument](v, path)(identity)
           v <- d.get(name).cata(_.right, BSONUndefined.right)
-          o =  d.elements.withFilter(_._1 != name).map(identity)
+          o =  d.elements.filter(_._1 != name)
           h <- BPH.unpickle(v, path :+ name)
           t <- BPT.unpickle(BSONDocument(o))
         } yield h :: t
