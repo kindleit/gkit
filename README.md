@@ -1,5 +1,7 @@
 # GKit #
 
+[![Join the chat at https://gitter.im/kindleit/gkit](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/kindleit/gkit?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 GKit is a set of combinator libraries which can ultimately be turned into powerful, composable REST servers.
 
 ### Download ###
