@@ -6,13 +6,23 @@ import bintray.Keys._
 
 object build extends Build {
 
-  val scalaV = "2.11.3"
+  val scalaV = "2.11.7"
 
   lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
-    version            := "0.4.0-SNAPSHOT",
+    version            := "0.4.0",
     organization       := "com.kindleit",
     scalaVersion       := scalaV,
-    scalacOptions     ++= Seq("-feature", "-optimize", "-language:implicitConversions", "-language:reflectiveCalls", "-language:higherKinds"),
+    scalacOptions     ++= Seq(
+      "-feature",
+      "-optimize",
+      "-language:implicitConversions",
+      "-language:reflectiveCalls",
+      "-language:higherKinds",
+      "-target:jvm-1.8",
+      "-Ybackend:GenBCode",
+      "-Ydelambdafy:method",
+      "-Yopt:l:classpath"
+    ),
     resolvers         ++= Seq(
       "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
       "Sonatype Snapshots"  at "https://oss.sonatype.org/content/repositories/snapshots/"),
@@ -22,6 +32,7 @@ object build extends Build {
     licenses          += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")))
 
   val scalaReflect  = "org.scala-lang"    %  "scala-reflect"    % scalaV
+  val java8Compat   = "org.scala-lang.modules" %% "scala-java8-compat" % "0.5.0"
   val jodaTime      = "joda-time"         %  "joda-time"        % "2.5"
   val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.7"
   val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0"
@@ -43,7 +54,7 @@ object build extends Build {
     base     = file("core"),
     settings = defaultSettings ++ Seq(
       name                := "gkit-core",
-      libraryDependencies ++= Seq(scalaReflect, scalaz, shapeless)))
+      libraryDependencies ++= Seq(java8Compat, scalaReflect, scalaz, shapeless)))
 
   lazy val mongo = Project(
     id       = "mongo",
