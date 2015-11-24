@@ -5,6 +5,7 @@ import play.api.libs.iteratee.Enumerator
 import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api._
+import reactivemongo.api.commands.GetLastError
 import reactivemongo.core.commands._
 
 import scala.concurrent.ExecutionContext
@@ -46,11 +47,11 @@ final class Collection(db: DefaultDB, cname: String) {
     db.collection(cname).insert(toBSONDoc(a))
 
   def insertMany[A](as: List[A])(implicit bp: BSONPickler[A], ec: ExecutionContext) =
-    db.collection(cname).bulkInsert(Enumerator(as.map(a => toBSONDoc(a)):_*))
+    db.collection(cname).bulkInsert(as.map(a => toBSONDoc(a)).toStream, false)
 
   def update[Q, M](query: Q = EmptyQ, modifier: M = EmptyQ, upsert: Boolean = false, multi: Boolean = false)
     (implicit qbp: BSONPickler[Q], mbp: BSONPickler[M], ec: ExecutionContext) =
-    db(cname).update(toBSONDoc(query), toBSONDoc(modifier), GetLastError(), upsert, multi)
+    db(cname).update(selector = toBSONDoc(query), update = toBSONDoc(modifier), upsert = upsert, multi = multi)
 
   def find[Q, F](query: Q = EmptyQ, fields: F = EmptyQ)
     (implicit qbp: BSONPickler[Q], fbp: BSONPickler[F], ec: ExecutionContext): QueryBuilder =
@@ -58,7 +59,7 @@ final class Collection(db: DefaultDB, cname: String) {
 
   def remove[Q](query: Q = EmptyQ, justOne: Boolean = false)
     (implicit qbp: BSONPickler[Q], ec: ExecutionContext) =
-    db(cname).remove(toBSONDoc(query), GetLastError(), justOne)
+    db(cname).remove(query = toBSONDoc(query), firstMatchOnly = justOne)
 
   def count[Q, F](query: Q = EmptyQ, fields: F = EmptyQ)
     (implicit qbp: BSONPickler[Q], fbp: BSONPickler[F], ec: ExecutionContext) = {

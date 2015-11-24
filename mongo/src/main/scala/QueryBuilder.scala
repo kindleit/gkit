@@ -16,7 +16,7 @@ import scalaz.syntax.std.option._
 case class QueryBuilder
   (
     db: DefaultDB
-  , queryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter]
+  , queryBuilder: GenericQueryBuilder[BSONSerializationPack.type]
   , offset: Int = 0
   , upTo: Int = Int.MaxValue
   )(implicit ec: ExecutionContext) {

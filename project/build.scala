@@ -38,7 +38,7 @@ object build extends Build {
   val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0"
   val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0"
   val shapeless     = "com.chuusai"       %%  "shapeless"       % "2.0.0"
-  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.10.5.0.akka23"
+  val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.11.7"
   val specs2        = "org.specs2"        %% "specs2-core"      % "2.4.6" % "test"
   val play          = "com.typesafe.play" %% "play"             % "2.3.0" % "provided"
   val playJSON      = "com.typesafe.play" %% "play-json"        % "2.3.0" % "provided"
