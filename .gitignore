@@ -6,3 +6,4 @@ target
 .settings
 *.orig
 .*.swp
+/.ensime*
