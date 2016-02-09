@@ -87,17 +87,13 @@ object Http {
 
   def askJReq = Kleisli.ask[EFE, JReq]
 
-  def liftK[A, B](f: A => Future[Error \/ B]): Kleisli[EFE, A, B] =
-    for {
-      r <- Kleisli.ask[EFE, A]
-      a <- EitherT(f(r)).liftM[({type λ[α[_],β]=Kleisli[α, A, β]})#λ]
-    } yield a
+  def idK[A]: Kleisli[EFE, A, A] = Kleisli.ask[EFE, A]
 
-  def idK[A]: Kleisli[EFE, A, A] =
-    liftK((a: A) => Future(a.right))
+  def liftK[A, B](f: A => Future[Error \/ B]): Kleisli[EFE, A, B] =
+    idK flatMapK (a => EitherT(f(a)))
 
   def constK[A, B](b: Future[Error \/ B]): Kleisli[EFE, A, B] =
-    liftK((_: A) => b)
+    EitherT(b).liftKleisli
 
   def paramsFromReq[A]: ParamsFromReq[A] = new ParamsFromReq[A]
 

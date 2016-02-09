@@ -9,7 +9,7 @@ object build extends Build {
   val scalaV = "2.11.7"
 
   lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
-    version            := "0.4.1",
+    version            := "0.4.3",
     organization       := "com.kindleit",
     scalaVersion       := scalaV,
     scalacOptions     ++= Seq(
