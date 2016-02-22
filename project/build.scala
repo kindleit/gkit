@@ -9,7 +9,7 @@ object build extends Build {
   val scalaV = "2.11.7"
 
   lazy val defaultSettings = Defaults.defaultSettings ++ unidocSettings ++ bintraySettings ++ Seq(
-    version            := "0.4.3",
+    version            := "0.4.4",
     organization       := "com.kindleit",
     scalaVersion       := scalaV,
     scalacOptions     ++= Seq(
@@ -34,11 +34,11 @@ object build extends Build {
   val java8Compat   = "org.scala-lang.modules" %% "scala-java8-compat" % "0.5.0"
   val jodaTime      = "joda-time"         %  "joda-time"        % "2.5"
   val jodaConvert   = "org.joda"          %  "joda-convert"     % "1.7"
-  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.1.0"
-  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.1.0"
+  val scalaz        = "org.scalaz"        %% "scalaz-core"      % "7.2.0"
+  val scalazEffect  = "org.scalaz"        %% "scalaz-effect"    % "7.2.0"
   val shapeless     = "com.chuusai"       %%  "shapeless"       % "2.0.0"
   val reactivemongo = "org.reactivemongo" %% "reactivemongo"    % "0.11.7"
-  val specs2        = "org.specs2"        %% "specs2-core"      % "2.4.6" % "test"
+  val specs2        = "org.specs2"        %% "specs2-core"      % "3.7" % "test"
   val play          = "com.typesafe.play" %% "play"             % "2.3.0" % "provided"
   val playJSON      = "com.typesafe.play" %% "play-json"        % "2.3.0" % "provided"
 
